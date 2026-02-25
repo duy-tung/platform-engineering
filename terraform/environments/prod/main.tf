@@ -3,8 +3,9 @@
 # =============================================================================
 
 module "vpc" {
-  source     = "../../modules/vpc"
-  project_id = var.project_id
+  source       = "../../modules/vpc"
+  project_id   = var.project_id
+  network_name = "prod-vpc"
 
   subnets = {
     prod-subnet = {
