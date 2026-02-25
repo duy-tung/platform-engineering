@@ -60,6 +60,22 @@ variable "app_spot" {
   default = true
 }
 
+variable "node_locations" {
+  type        = list(string)
+  default     = []
+  description = "Zones for nodes. Empty = all zones (regional default)"
+}
+
+variable "enable_private_nodes" {
+  type    = bool
+  default = false
+}
+
+variable "disk_size_gb" {
+  type    = number
+  default = 30
+}
+
 # ---- Cluster ----
 resource "google_container_cluster" "cluster" {
   name     = var.cluster_name
@@ -69,13 +85,18 @@ resource "google_container_cluster" "cluster" {
   remove_default_node_pool = true
   initial_node_count       = 1
 
+  node_locations = length(var.node_locations) > 0 ? var.node_locations : null
+
   network    = var.network
   subnetwork = var.subnetwork
 
-  private_cluster_config {
-    enable_private_nodes    = true
-    enable_private_endpoint = false
-    master_ipv4_cidr_block  = var.master_ipv4_cidr
+  dynamic "private_cluster_config" {
+    for_each = var.enable_private_nodes ? [1] : []
+    content {
+      enable_private_nodes    = true
+      enable_private_endpoint = false
+      master_ipv4_cidr_block  = var.master_ipv4_cidr
+    }
   }
 
   master_authorized_networks_config {
@@ -132,7 +153,7 @@ resource "google_container_node_pool" "system" {
 
   node_config {
     machine_type = var.system_machine_type
-    disk_size_gb = 50
+    disk_size_gb = var.disk_size_gb
     disk_type    = "pd-standard"
 
     workload_metadata_config {

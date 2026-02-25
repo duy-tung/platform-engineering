@@ -1,79 +1,64 @@
-# 🏗️ Platform Engineering — Learning Path
+# Platform Engineering
 
-12-month hands-on learning journey for GCP platform engineering.
+Production-grade Kubernetes platform on GCP — designed for learning with big tech patterns.
 
 ## Architecture
 
 ```
-┌─── Week 1-2: Foundation ─────────────────────────────────────┐
-│  VPC (Custom) → Subnets → Cloud NAT → Firewall              │
-│  GKE Staging (asia-southeast1) + GKE Prod (us-central1)     │
-│  Artifact Registry                                           │
-├─── Week 3: Data ─────────────────────────────────────────────┤
-│  Cloud SQL PostgreSQL 16 (Private IP)                        │
-│  Secret Manager │ Private Service Connection                 │
-│  kube-prometheus-stack (Prometheus + Grafana)                 │
-├─── Week 4: CI/CD ────────────────────────────────────────────┤
-│  Go API → Dockerfile (multi-stage) → Cloud Build             │
-│  Kustomize (base + overlays) → ArgoCD (GitOps)               │
-│  GitHub Actions: build → test → scan → push                  │
-├─── Week 5: Security ─────────────────────────────────────────┤
-│  Pod Security Standards (restricted)                         │
-│  OPA Gatekeeper (3 constraint templates)                     │
-│  NetworkPolicy (zero trust)                                  │
-├─── Week 6: Advanced Terraform ───────────────────────────────┤
-│  Reusable modules: VPC, GKE, Cloud SQL                       │
-│  Root module composition (500+ → 80 lines)                   │
-│  CI: terraform plan on PR + Infracost                        │
-└──────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│ GitHub Actions CI/CD                        │
+│ ├── Build → Test → Scan → Push              │
+│ └── Terraform Plan (PR review)              │
+└─────────────┬───────────────────────────────┘
+              │ GitOps (ArgoCD)
+              ▼
+┌──────────────────┐  ┌──────────────────────┐
+│ staging-cluster  │  │ prod-cluster         │
+│ (zonal, free)    │  │ (regional, HA)       │
+│ 1 × e2-small     │  │ 1 × e2-small        │
+│ spot             │  │ spot                 │
+└──────────────────┘  └──────────────────────┘
 ```
 
 ## Directory Structure
 
 ```
-├── modules/              # Reusable Terraform modules
-│   ├── vpc/              # VPC + Subnets + NAT + Firewall
-│   ├── gke/              # Private GKE + Node Pools
-│   └── cloudsql/         # PostgreSQL + Secrets
-├── infra/                # Root module (composes all modules)
-├── week1-vpc/            # Week 1: VPC setup
-├── week2-gke/            # Week 2: GKE clusters
-├── week3-data/           # Week 3: Cloud SQL + Secrets
-├── app/                  # Go API (platform-api)
-├── k8s/                  # Kubernetes manifests
-│   ├── base/             # Kustomize base
-│   ├── overlays/         # Staging + Production
-│   └── security/         # Gatekeeper + NetworkPolicy
-└── .github/workflows/    # CI/CD pipelines
+terraform/
+├── modules/              # Reusable: vpc, gke, cloudsql
+└── environments/         # Per-env state
+    ├── staging/          # Zonal (free tier)
+    └── prod/             # Regional (HA)
+apps/
+└── platform-api/         # Go API + Dockerfile
+deploy/
+└── k8s/
+    ├── base/             # Shared manifests
+    ├── overlays/         # staging + prod configs
+    └── policies/         # Gatekeeper + NetworkPolicy
+.github/workflows/
+├── ci.yaml               # App CI/CD
+└── terraform.yaml        # IaC plan on PR
 ```
 
 ## Quick Start
 
 ```bash
-# 1. Copy tfvars
-cp terraform.tfvars.example week1-vpc/terraform.tfvars
-# Edit with your project_id and credentials
+# Start infrastructure (~5 min)
+./scripts/start.sh
 
-# 2. Deploy infrastructure (in order)
-cd week1-vpc && terraform init && terraform apply
-cd ../week2-gke && terraform init && terraform apply
-cd ../week3-data && terraform init && terraform apply
-
-# 3. Build & deploy app
-gcloud builds submit app/ --tag=REGISTRY/platform-api:v1
-kubectl apply -k k8s/overlays/staging/
+# Stop to save costs
+./scripts/stop.sh
 ```
+
+## Cost: ~$97/month
+
+| Resource | Cost |
+|----------|------|
+| GKE staging (zonal, free) | $0 |
+| GKE prod (regional, HA) | $74 |
+| 2 × e2-small spot | $14 |
+| Storage | $3 |
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Cloud | GCP (GKE, Cloud SQL, Secret Manager, Artifact Registry) |
-| IaC | Terraform + reusable modules |
-| Container | Docker (multi-stage, scratch) |
-| Orchestration | Kubernetes (GKE) |
-| GitOps | ArgoCD |
-| CI/CD | GitHub Actions |
-| Monitoring | Prometheus + Grafana |
-| Security | PSS + OPA Gatekeeper + NetworkPolicy |
-| App | Go (stdlib) |
+Terraform · GKE · ArgoCD · Kustomize · GitHub Actions · Go · Docker · OPA Gatekeeper · Prometheus

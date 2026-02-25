@@ -1,14 +1,12 @@
-name: Build & Push
+name: Build & Deploy
 
 on:
   push:
     branches: [main]
-    paths:
-      - 'app/**'
+    paths: ['apps/**']
   pull_request:
     branches: [main]
-    paths:
-      - 'app/**'
+    paths: ['apps/**']
 
 env:
   PROJECT_ID: infra-learning-pdtung1605
@@ -21,71 +19,52 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      id-token: write # Cho Workload Identity Federation
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
 
-      # ---- Test ----
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
 
       - name: Run tests
-        working-directory: app
-        run: go test ./... -v
+        run: cd apps/platform-api && go test ./...
 
-      # ---- Auth với GCP (Workload Identity Federation) ----
-      # Cài đặt 1 lần: tạo Workload Identity Pool + Provider trên GCP
-      # Sau đó không cần key file, GitHub tự authenticate
       - id: auth
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: 'projects/866925958777/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
           service_account: 'github-actions@infra-learning-pdtung1605.iam.gserviceaccount.com'
 
-      # ---- Build & Push ----
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-
       - name: Configure Docker
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
       - name: Build & Push
         run: |
-          VERSION=${GITHUB_SHA::8}
-          docker build \
-            --build-arg VERSION=$VERSION \
-            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:$VERSION \
-            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:latest \
-            app/
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:$VERSION
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:latest
+          IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${GITHUB_SHA::8}
+          docker build -t $IMAGE_TAG apps/platform-api/
+          docker push $IMAGE_TAG
 
-      # ---- Security Scan ----
-      - name: Trivy Scan
+      - name: Trivy scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: '${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:latest'
-          format: 'table'
+          image-ref: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ github.sha }}
           severity: 'CRITICAL,HIGH'
+          exit-code: '0'
 
-      # ---- Update K8s manifests ----
-      # Cập nhật image tag trong Kustomize → ArgoCD tự detect → auto-deploy
-      - name: Update Kustomize image tag
-        if: github.event_name == 'push'
-        run: |
-          VERSION=${GITHUB_SHA::8}
-          cd k8s/overlays/staging
-          kustomize edit set image platform-api=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:$VERSION
-          cd ../../overlays/prod
-          kustomize edit set image platform-api=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:$VERSION
-
+      # Update kustomize image tag (only on push to main)
       - name: Commit & Push manifest changes
         if: github.event_name == 'push'
         run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add k8s/
-          git diff --staged --quiet || git commit -m "ci: update image to ${GITHUB_SHA::8}"
-          git push origin HEAD:main
+          IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${GITHUB_SHA::8}
+          cd deploy/k8s/overlays/staging
+          kustomize edit set image platform-api=$IMAGE_TAG
+          cd ../prod
+          kustomize edit set image platform-api=$IMAGE_TAG
+          cd ../../../..
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add deploy/
+          git commit -m "ci: update image to ${GITHUB_SHA::8}" || exit 0
+          git push origin main
