@@ -90,16 +90,29 @@ jobs:
         with:
           api-key: ${{ secrets.INFRACOST_API_KEY }}
 
-      - name: Generate cost estimate
+      # Tạo cost baseline từ main branch
+      - name: Generate Infracost baseline
         run: |
+          git fetch origin main:refs/remotes/origin/main
+          git checkout origin/main -- ${{ env.TF_DIR }}
           infracost breakdown --path=${{ env.TF_DIR }} \
-            --format=json --out-file=/tmp/infracost.json
+            --format=json --out-file=/tmp/infracost-base.json
+          git checkout -- ${{ env.TF_DIR }}
+
+      # Tạo cost từ PR branch
+      - name: Generate Infracost diff
+        run: |
+          infracost diff --path=${{ env.TF_DIR }} \
+            --compare-to=/tmp/infracost-base.json \
+            --format=json --out-file=/tmp/infracost-diff.json
 
       - name: Post cost comment
         run: |
           infracost comment github \
-            --path=/tmp/infracost.json \
+            --path=/tmp/infracost-diff.json \
             --repo=${{ github.repository }} \
             --pull-request=${{ github.event.pull_request.number }} \
-            --github-token=${{ github.token }}
+            --github-token=${{ github.token }} \
+            --behavior=update
+
 
