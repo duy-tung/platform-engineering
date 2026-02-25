@@ -1,0 +1,4 @@
+# Sao chép file này thành terraform.tfvars và điền giá trị thật
+project_id       = "your-gcp-project-id"
+region           = "asia-southeast1"
+credentials_file = "~/terraform-key.json"

@@ -1,0 +1,89 @@
+name: Build & Push
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/**'
+
+env:
+  PROJECT_ID: infra-learning-pdtung1605
+  REGION: asia-southeast1
+  REPO: platform-images
+  IMAGE: platform-api
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # Cho Workload Identity Federation
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ---- Test ----
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Run tests
+        working-directory: app
+        run: go test ./... -v
+
+      # ---- Auth với GCP (Workload Identity Federation) ----
+      # Cài đặt 1 lần: tạo Workload Identity Pool + Provider trên GCP
+      # Sau đó không cần key file, GitHub tự authenticate
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/${{ env.PROJECT_ID }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'github-actions@${{ env.PROJECT_ID }}.iam.gserviceaccount.com'
+
+      # ---- Build & Push ----
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build & Push
+        run: |
+          VERSION=${GITHUB_SHA::8}
+          docker build \
+            --build-arg VERSION=$VERSION \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:$VERSION \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:latest \
+            app/
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:$VERSION
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:latest
+
+      # ---- Security Scan ----
+      - name: Trivy Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:latest'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+
+      # ---- Update K8s manifests ----
+      # Cập nhật image tag trong Kustomize → ArgoCD tự detect → auto-deploy
+      - name: Update Kustomize image tag
+        run: |
+          VERSION=${GITHUB_SHA::8}
+          cd k8s/overlays/staging
+          kustomize edit set image platform-api=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:$VERSION
+          cd ../../overlays/prod
+          kustomize edit set image platform-api=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:$VERSION
+
+      - name: Commit & Push manifest changes
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add k8s/
+          git diff --staged --quiet || git commit -m "ci: update image to ${GITHUB_SHA::8}"
+          git push

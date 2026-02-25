@@ -1,0 +1,24 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfplan
+.terraform.lock.hcl
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Terraform variables (chứa giá trị nhạy cảm)
+*.tfvars
+*.tfvars.json
+
+# Credentials - QUAN TRỌNG!
+terraform-key.json
+*-key.json
+*.pem
+
+# OS files
+.DS_Store
+Thumbs.db

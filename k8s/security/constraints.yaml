@@ -1,0 +1,41 @@
+# ---- Constraint: Require 'app' label on all Pods ----
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sRequiredLabels
+metadata:
+  name: require-app-label
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    namespaces: ["staging", "production"]
+  parameters:
+    labels:
+      - "app"
+---
+# ---- Constraint: Block ':latest' tag ----
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sBlockLatestTag
+metadata:
+  name: block-latest-tag
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    namespaces: ["staging", "production"]
+---
+# ---- Constraint: Require resource limits ----
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sRequireResourceLimits
+metadata:
+  name: require-resource-limits
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    namespaces: ["staging", "production"]

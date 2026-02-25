@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: platform-api
+  labels:
+    app: platform-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: platform-api
+  template:
+    metadata:
+      labels:
+        app: platform-api
+    spec:
+      # ---- Security Context (Pod Level) ----
+      # Áp dụng cho TẤT CẢ containers trong pod
+      securityContext:
+        runAsNonRoot: true          # Cấm chạy root
+        runAsUser: 65534            # nobody user
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault      # Dùng seccomp mặc định (chặn syscall nguy hiểm)
+      containers:
+        - name: platform-api
+          image: platform-api
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+          # ---- Security Context (Container Level) ----
+          securityContext:
+            allowPrivilegeEscalation: false  # Không cho leo thang quyền
+            readOnlyRootFilesystem: true     # Filesystem chỉ đọc
+            capabilities:
+              drop:
+                - ALL                         # Bỏ hết Linux capabilities
+          # Liveness: K8s restart container nếu /health fail
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          # Readiness: K8s chỉ gửi traffic khi /ready trả OK
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      # Toleration cho Spot VM (app-pool)
+      tolerations:
+        - key: "spot"
+          operator: "Equal"
+          value: "true"
+          effect: "PreferNoSchedule"
+      # Prefer app-pool nodes
+      nodeSelector:
+        role: app

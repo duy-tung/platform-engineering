@@ -1,0 +1,60 @@
+# Default deny all ingress + egress
+# Sau đó mở từng cái cụ thể
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: staging
+spec:
+  podSelector: {} # Áp dụng cho TẤT CẢ pods
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Cho phép platform-api nhận traffic từ bất kỳ đâu trong cluster
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-platform-api-ingress
+  namespace: staging
+spec:
+  podSelector:
+    matchLabels:
+      app: platform-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector: {} # Từ bất kỳ namespace
+      ports:
+        - port: 8080
+          protocol: TCP
+---
+# Cho phép platform-api gọi ra ngoài (DNS + Cloud SQL)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-platform-api-egress
+  namespace: staging
+spec:
+  podSelector:
+    matchLabels:
+      app: platform-api
+  policyTypes:
+    - Egress
+  egress:
+    - to: # DNS (kube-dns)
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to: # Cloud SQL (private IP range)
+        - ipBlock:
+            cidr: 10.117.0.0/16
+      ports:
+        - port: 5432
+          protocol: TCP

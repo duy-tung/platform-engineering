@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: production
+
+resources:
+  - ../../base
+
+images:
+  - name: platform-api
+    newName: asia-southeast1-docker.pkg.dev/infra-learning-pdtung1605/platform-images/platform-api
+    newTag: latest
+
+patches:
+  - target:
+      kind: Deployment
+      name: platform-api
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 2

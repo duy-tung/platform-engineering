@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: staging
+
+resources:
+  - ../../base
+
+# Override image cho staging
+images:
+  - name: platform-api
+    newName: asia-southeast1-docker.pkg.dev/infra-learning-pdtung1605/platform-images/platform-api
+    newTag: v1
+
+# Staging-specific patches
+patches:
+  - target:
+      kind: Deployment
+      name: platform-api
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
