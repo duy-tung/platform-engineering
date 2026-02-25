@@ -4,18 +4,18 @@ kind: Kustomization
 namespace: production
 
 resources:
-  - ../../base
+- ../../base
 
 images:
-  - name: platform-api
-    newName: asia-southeast1-docker.pkg.dev/infra-learning-pdtung1605/platform-images/platform-api
-    newTag: latest
+- name: platform-api
+  newName: asia-southeast1-docker.pkg.dev/infra-learning-pdtung1605/platform-images/platform-api
+  newTag: eb8cc784
 
 patches:
-  - target:
-      kind: Deployment
-      name: platform-api
-    patch: |
-      - op: replace
-        path: /spec/replicas
-        value: 2
+- patch: |
+    - op: replace
+      path: /spec/replicas
+      value: 2
+  target:
+    kind: Deployment
+    name: platform-api

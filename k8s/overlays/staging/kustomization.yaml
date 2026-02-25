@@ -4,20 +4,20 @@ kind: Kustomization
 namespace: staging
 
 resources:
-  - ../../base
+- ../../base
 
 # Override image cho staging
 images:
-  - name: platform-api
-    newName: asia-southeast1-docker.pkg.dev/infra-learning-pdtung1605/platform-images/platform-api
-    newTag: v1
+- name: platform-api
+  newName: asia-southeast1-docker.pkg.dev/infra-learning-pdtung1605/platform-images/platform-api
+  newTag: eb8cc784
 
 # Staging-specific patches
 patches:
-  - target:
-      kind: Deployment
-      name: platform-api
-    patch: |
-      - op: replace
-        path: /spec/replicas
-        value: 1
+- patch: |
+    - op: replace
+      path: /spec/replicas
+      value: 1
+  target:
+    kind: Deployment
+    name: platform-api
