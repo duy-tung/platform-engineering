@@ -189,7 +189,7 @@ resource "google_container_node_pool" "staging_app" {
   cluster  = google_container_cluster.staging.id
   location = var.region
 
-  node_count = 2 # Tăng lên 2 để test Infracost cost report
+  node_count = 1 # Giảm xuống 1 để tiết kiệm
 
   node_config {
     machine_type = "e2-medium"
