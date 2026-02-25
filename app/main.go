@@ -122,3 +122,4 @@ func main() {
 }
 
 // TODO: Week 7 — Add HPA metrics endpoint
+
