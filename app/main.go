@@ -120,3 +120,5 @@ func main() {
 		log.Fatalf("Server failed: %v", err)
 	}
 }
+
+// TODO: Week 7 — Add HPA metrics endpoint
