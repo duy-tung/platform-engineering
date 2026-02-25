@@ -35,9 +35,9 @@ module "gke" {
   pods_range_name     = "prod-pods"
   services_range_name = "prod-services"
 
-  system_machine_type = "e2-small"
+  system_machine_type = "e2-medium"
   system_node_count   = 0
-  app_machine_type    = "e2-small"
+  app_machine_type    = "e2-medium"
   app_node_count      = 1
   app_spot            = true
 

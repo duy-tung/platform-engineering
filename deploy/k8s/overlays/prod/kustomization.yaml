@@ -9,7 +9,7 @@ resources:
 images:
 - name: platform-api
   newName: asia-southeast1-docker.pkg.dev/infra-learning-pdtung1605/platform-images/platform-api
-  newTag: eb8cc784
+  newTag: 0e3201c
 
 patches:
 - patch: |
