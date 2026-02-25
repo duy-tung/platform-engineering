@@ -1,4 +1,5 @@
 terraform {
+  # GKE clusters: staging (asia-southeast1) + prod (us-central1)
   required_version = ">= 1.5.0"
 
   required_providers {
