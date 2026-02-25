@@ -13,3 +13,9 @@ variable "credentials_file" {
   type        = string
   sensitive   = true
 }
+
+# Week 6 módulo verificación
+variable "environment" {
+  type    = string
+  default = "staging"
+}
