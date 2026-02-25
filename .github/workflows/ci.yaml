@@ -73,6 +73,7 @@ jobs:
       # ---- Update K8s manifests ----
       # Cập nhật image tag trong Kustomize → ArgoCD tự detect → auto-deploy
       - name: Update Kustomize image tag
+        if: github.event_name == 'push'
         run: |
           VERSION=${GITHUB_SHA::8}
           cd k8s/overlays/staging
@@ -81,9 +82,10 @@ jobs:
           kustomize edit set image platform-api=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:$VERSION
 
       - name: Commit & Push manifest changes
+        if: github.event_name == 'push'
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add k8s/
           git diff --staged --quiet || git commit -m "ci: update image to ${GITHUB_SHA::8}"
-          git push
+          git push origin HEAD:main
