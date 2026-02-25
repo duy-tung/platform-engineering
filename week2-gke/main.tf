@@ -1,4 +1,5 @@
 terraform {
+  # GKE clusters: staging (asia-southeast1) + prod (us-central1)
   required_version = ">= 1.5.0"
 
   required_providers {
@@ -188,7 +189,7 @@ resource "google_container_node_pool" "staging_app" {
   cluster  = google_container_cluster.staging.id
   location = var.region
 
-  node_count = 1 # Giảm xuống 1 để tiết kiệm (plan gốc là 2)
+  node_count = 1 # Giảm xuống 1 để tiết kiệm
 
   node_config {
     machine_type = "e2-medium"
