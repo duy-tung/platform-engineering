@@ -9,7 +9,7 @@ on:
       - 'week*/**'
 
 env:
-  TF_DIR: infra
+  TF_DIR: week2-gke
 
 jobs:
   plan:
@@ -30,7 +30,7 @@ jobs:
       - id: auth
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: 'projects/infra-learning-pdtung1605/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          workload_identity_provider: 'projects/866925958777/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
           service_account: 'github-actions@infra-learning-pdtung1605.iam.gserviceaccount.com'
 
       - name: Terraform Init
