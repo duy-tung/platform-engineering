@@ -1,0 +1,46 @@
+name: Terraform Apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform-apply.yaml'
+
+env:
+  TF_VERSION: '1.9.0'
+  PROJECT_ID: 'infra-learning-pdtung1605'
+
+jobs:
+  apply:
+    strategy:
+      max-parallel: 1
+      matrix:
+        env: [staging, prod]
+    name: Apply ${{ matrix.env }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/866925958777/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'github-actions@infra-learning-pdtung1605.iam.gserviceaccount.com'
+
+      - name: Terraform Init
+        run: terraform -chdir=terraform/environments/${{ matrix.env }} init -input=false
+
+      - name: Terraform Apply
+        run: |
+          terraform -chdir=terraform/environments/${{ matrix.env }} apply \
+            -var="project_id=${{ env.PROJECT_ID }}" \
+            -auto-approve -input=false
