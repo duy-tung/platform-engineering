@@ -1,0 +1,2 @@
+# Prod: 2 replicas
+replicaCount: 2

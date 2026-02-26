@@ -1,0 +1,38 @@
+# ---- App ----
+replicaCount: 1
+
+image:
+  repository: asia-southeast1-docker.pkg.dev/infra-learning-pdtung1605/platform-images/platform-api
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi
+
+# ---- PostgreSQL ----
+postgres:
+  enabled: true
+  image: postgres:16-alpine
+  storageSize: 10Gi
+  storageClass: standard-rwo
+  credentials:
+    user: platformuser
+    password: platformpass123
+    database: platformdb
+
+# ---- Node scheduling ----
+spot:
+  enabled: true
+
+nodeSelector:
+  role: app
