@@ -57,18 +57,14 @@ jobs:
           severity: 'CRITICAL,HIGH'
           exit-code: '0'
 
-      # Update kustomize image tag (only on push to main)
-      - name: Commit & Push manifest changes
+      # Update Helm values image tag (only on push to main)
+      - name: Update Helm image tag
         if: github.event_name == 'push'
         run: |
-          IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ steps.vars.outputs.SHORT_SHA }}
-          cd deploy/k8s/overlays/staging
-          kustomize edit set image platform-api=$IMAGE_TAG
-          cd ../prod
-          kustomize edit set image platform-api=$IMAGE_TAG
-          cd ../../../..
+          SHORT_SHA=${{ steps.vars.outputs.SHORT_SHA }}
+          sed -i "s|  tag: .*|  tag: \"${SHORT_SHA}\"|" deploy/helm/platform-api/values.yaml
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add deploy/
-          git commit -m "ci: update image to ${{ steps.vars.outputs.SHORT_SHA }}" || exit 0
+          git commit -m "ci: update image to ${SHORT_SHA}" || exit 0
           git push origin main
