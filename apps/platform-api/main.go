@@ -269,6 +269,7 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"service": "platform-api",
 		"version": Version,
+		"deploy":  "helm",
 		"docs":    "/health, /ready, /version, /db-check, /users",
 	})
 }
