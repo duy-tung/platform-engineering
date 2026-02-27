@@ -10,8 +10,9 @@ RUN go mod download
 
 # Copy source code và build binary
 COPY . .
+ARG VERSION=dev
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-    -ldflags="-s -w -X main.Version=${VERSION:-dev}" \
+    -ldflags="-s -w -X main.Version=${VERSION}" \
     -o /platform-api .
 
 # ---- Stage 2: Runtime ----

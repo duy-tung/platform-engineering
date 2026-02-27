@@ -1,4 +1,4 @@
-name: Build & Deploy
+name: CI/CD — Platform API
 
 on:
   push:
@@ -13,20 +13,15 @@ env:
   REGION: asia-southeast1
   REPO: platform-images
   IMAGE: platform-api
+  CLUSTER: prod-cluster
+  CLUSTER_ZONE: asia-southeast1
 
 jobs:
-  build:
+  # ─── Job 1: Test (PR + push) ───────────────────────────
+  test:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      id-token: write
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set short SHA
-        id: vars
-        run: echo "SHORT_SHA=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
 
       - uses: actions/setup-go@v5
         with:
@@ -36,36 +31,90 @@ jobs:
       - name: Run tests
         run: cd apps/platform-api && go test ./...
 
+  # ─── Job 2: Build + Deploy (only on push to main) ──────
+  build-deploy:
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: vars
+        run: echo "SHORT_SHA=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+
+      # ── Auth ──
       - id: auth
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: 'projects/866925958777/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
           service_account: 'github-actions@infra-learning-pdtung1605.iam.gserviceaccount.com'
 
+      # ── Build & Push ──
       - name: Configure Docker
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
       - name: Build & Push
         run: |
           IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ steps.vars.outputs.SHORT_SHA }}
-          docker build -t $IMAGE_TAG apps/platform-api/
+          docker build \
+            --build-arg VERSION=${{ steps.vars.outputs.SHORT_SHA }} \
+            -t $IMAGE_TAG \
+            apps/platform-api/
           docker push $IMAGE_TAG
 
-      - name: Trivy scan
+      - name: Trivy security scan
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ steps.vars.outputs.SHORT_SHA }}
           severity: 'CRITICAL,HIGH'
           exit-code: '1'
 
-      # Update Helm values image tag (only on push to main)
-      - name: Update Helm image tag
-        if: github.event_name == 'push'
+      # ── Deploy to GKE ──
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ env.CLUSTER }}
+          location: ${{ env.CLUSTER_ZONE }}
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install platform-api deploy/helm/platform-api \
+            -n production \
+            -f deploy/helm/platform-api/values.yaml \
+            -f deploy/helm/platform-api/values-prod.yaml \
+            --set image.tag=${{ steps.vars.outputs.SHORT_SHA }} \
+            --set replicaCount=1 \
+            --set hpa.enabled=false \
+            --set pdb.enabled=false \
+            --wait --timeout 5m
+
+      - name: Smoke test
+        run: |
+          echo "Waiting for rollout..."
+          sleep 15
+          STATUS=$(curl -sf --max-time 10 https://platform.duy-tung.dev/health | jq -r .status)
+          if [ "$STATUS" != "ok" ]; then
+            echo "❌ Smoke test failed: status=$STATUS"
+            exit 1
+          fi
+          echo "✅ Smoke test passed: status=$STATUS"
+
+      # ── Update image tag in repo ──
+      - name: Update values-prod.yaml image tag
         run: |
           SHORT_SHA=${{ steps.vars.outputs.SHORT_SHA }}
-          sed -i "s|  tag: .*|  tag: \"${SHORT_SHA}\"|" deploy/helm/platform-api/values.yaml
+          sed -i "s|  tag: .*|  tag: \"${SHORT_SHA}\"|" deploy/helm/platform-api/values-prod.yaml
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add deploy/
-          git commit -m "ci: update image to ${SHORT_SHA}" || exit 0
+          git add deploy/helm/platform-api/values-prod.yaml
+          git commit -m "ci: update image to ${SHORT_SHA} [skip ci]" || exit 0
           git push origin main
