@@ -85,19 +85,8 @@ resource "google_compute_router_nat" "nat" {
   }
 }
 
-# ---- Firewall ----
-resource "google_compute_firewall" "deny_all_ingress" {
-  name      = "${var.network_name}-deny-all-ingress"
-  network   = google_compute_network.vpc.id
-  priority  = 1000
-  direction = "INGRESS"
-  project   = var.project_id
-
-  deny {
-    protocol = "all"
-  }
-  source_ranges = ["0.0.0.0/0"]
-}
+# NOTE: deny_all_ingress firewall removed — it blocked GKE master→pod
+# communication (webhooks, kubelet). K8s NetworkPolicies used instead.
 
 resource "google_compute_firewall" "allow_iap_ssh" {
   name      = "${var.network_name}-allow-iap-ssh"
