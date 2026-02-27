@@ -37,4 +37,4 @@ spot:
 serviceAccountName: platform-api
 
 image:
-  tag: "separate-env"
+  tag: "021a5ebf"
