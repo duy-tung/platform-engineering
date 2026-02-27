@@ -1,4 +1,4 @@
-name: CI/CD — Platform API
+name: CI — Platform API
 
 on:
   push:
@@ -29,8 +29,10 @@ jobs:
       - name: Run tests
         run: cd apps/platform-api && go test ./...
 
-  # ─── Job 2: Build + Deploy (only on push to main) ──────
-  build-deploy:
+  # ─── Job 2: Build + Push (only on push to main) ────────
+  # ArgoCD watches the Git repo and auto-syncs deployments.
+  # CI only: test → build → push → Trivy → commit tag.
+  build:
     needs: test
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -72,82 +74,8 @@ jobs:
           severity: 'CRITICAL'
           exit-code: '1'
 
-      - name: Install Helm
-        uses: azure/setup-helm@v4
-
-      # ── Deploy to STAGING ──
-      - name: Get staging credentials
-        uses: google-github-actions/get-gke-credentials@v2
-        with:
-          cluster_name: staging-cluster
-          location: ${{ env.REGION }}-a
-          project_id: ${{ env.PROJECT_ID }}
-
-      - name: Deploy to staging
-        run: |
-          helm upgrade --install platform-api deploy/helm/platform-api \
-            -n staging --create-namespace \
-            -f deploy/helm/platform-api/values.yaml \
-            -f deploy/helm/platform-api/values-staging.yaml \
-            --set image.tag=${{ steps.vars.outputs.SHORT_SHA }} \
-            --wait --timeout 5m
-
-      - name: Smoke test staging
-        run: |
-          kubectl port-forward svc/platform-api 9090:80 -n staging &
-          PF_PID=$!
-          sleep 5
-          for i in $(seq 1 5); do
-            STATUS=$(curl -sf --max-time 5 http://localhost:9090/health | jq -r .status 2>/dev/null || echo "")
-            if [ "$STATUS" = "ok" ]; then
-              echo "✅ Staging smoke test passed on attempt $i"
-              kill $PF_PID 2>/dev/null
-              exit 0
-            fi
-            echo "Attempt $i/5: status=$STATUS, retrying in 10s..."
-            sleep 10
-          done
-          kill $PF_PID 2>/dev/null
-          echo "❌ Staging smoke test failed"
-          exit 1
-
-      # ── Deploy to PRODUCTION ──
-      - name: Get prod credentials
-        uses: google-github-actions/get-gke-credentials@v2
-        with:
-          cluster_name: prod-cluster
-          location: ${{ env.REGION }}
-          project_id: ${{ env.PROJECT_ID }}
-
-      - name: Deploy to production
-        run: |
-          helm upgrade --install platform-api deploy/helm/platform-api \
-            -n production \
-            -f deploy/helm/platform-api/values.yaml \
-            -f deploy/helm/platform-api/values-prod.yaml \
-            --set image.tag=${{ steps.vars.outputs.SHORT_SHA }} \
-            --set replicaCount=1 \
-            --set hpa.enabled=false \
-            --set pdb.enabled=false \
-            --wait --timeout 8m
-
-      - name: Smoke test production
-        run: |
-          echo "Waiting for LB to register new pod..."
-          for i in $(seq 1 10); do
-            STATUS=$(curl -sf --max-time 10 https://platform.duy-tung.dev/health | jq -r .status 2>/dev/null || echo "")
-            if [ "$STATUS" = "ok" ]; then
-              echo "✅ Production smoke test passed on attempt $i"
-              exit 0
-            fi
-            echo "Attempt $i/10: status=$STATUS, retrying in 15s..."
-            sleep 15
-          done
-          echo "❌ Production smoke test failed"
-          exit 1
-
-      # ── Update image tag in repo ──
-      - name: Update values image tags
+      # ── Update image tag → ArgoCD auto-syncs ──
+      - name: Update image tag in values files
         run: |
           SHORT_SHA=${{ steps.vars.outputs.SHORT_SHA }}
           sed -i "s|  tag: .*|  tag: \"${SHORT_SHA}\"|" deploy/helm/platform-api/values-prod.yaml

@@ -14,7 +14,7 @@ spec:
         - values.yaml
         - values-staging.yaml
   destination:
-    server: https://kubernetes.default.svc
+    server: https://136.110.33.133
     namespace: staging
   syncPolicy:
     automated:
