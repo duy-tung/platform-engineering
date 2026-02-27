@@ -95,7 +95,7 @@ jobs:
             --set replicaCount=1 \
             --set hpa.enabled=false \
             --set pdb.enabled=false \
-            --wait --timeout 5m
+            --wait --timeout 8m
 
       - name: Smoke test
         run: |

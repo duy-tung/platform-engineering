@@ -6,6 +6,10 @@ metadata:
     {{- include "platform-api.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  {{- if eq (int .Values.replicaCount) 1 }}
+  strategy:
+    type: Recreate
+  {{- end }}
   selector:
     matchLabels:
       {{- include "platform-api.selectorLabels" . | nindent 6 }}
