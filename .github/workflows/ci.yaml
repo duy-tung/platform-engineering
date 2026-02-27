@@ -94,15 +94,20 @@ jobs:
 
       - name: Smoke test staging
         run: |
+          kubectl port-forward svc/platform-api 9090:80 -n staging &
+          PF_PID=$!
+          sleep 5
           for i in $(seq 1 5); do
-            STATUS=$(kubectl exec -n staging deploy/platform-api -- wget -qO- http://localhost:8080/health 2>/dev/null | jq -r .status 2>/dev/null || echo "")
+            STATUS=$(curl -sf --max-time 5 http://localhost:9090/health | jq -r .status 2>/dev/null || echo "")
             if [ "$STATUS" = "ok" ]; then
               echo "✅ Staging smoke test passed on attempt $i"
+              kill $PF_PID 2>/dev/null
               exit 0
             fi
             echo "Attempt $i/5: status=$STATUS, retrying in 10s..."
             sleep 10
           done
+          kill $PF_PID 2>/dev/null
           echo "❌ Staging smoke test failed"
           exit 1
 
