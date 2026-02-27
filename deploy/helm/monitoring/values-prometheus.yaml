@@ -1,0 +1,70 @@
+# kube-prometheus-stack — lean config for learning (e2-medium nodes)
+prometheus:
+  prometheusSpec:
+    retention: 7d
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+    # Tolerate app-pool nodes
+    tolerations:
+      - key: "spot"
+        operator: "Equal"
+        value: "true"
+        effect: "PreferNoSchedule"
+
+grafana:
+  adminPassword: "admin"  # Change in prod
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  tolerations:
+    - key: "spot"
+      operator: "Equal"
+      value: "true"
+      effect: "PreferNoSchedule"
+
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+    tolerations:
+      - key: "spot"
+        operator: "Equal"
+        value: "true"
+        effect: "PreferNoSchedule"
+
+# Node exporter on all nodes
+nodeExporter:
+  tolerations:
+    - effect: NoSchedule
+      operator: Exists
+
+# Lightweight kube-state-metrics
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi

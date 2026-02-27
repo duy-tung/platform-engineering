@@ -1,2 +1,40 @@
-# Prod: 2 replicas
-replicaCount: 2
+# Production: Cloud SQL, HA, auto-scaling, on-demand
+replicaCount: 3
+
+database:
+  mode: cloudsql
+  incluster:
+    enabled: false
+  cloudsql:
+    enabled: true
+    connectionName: "infra-learning-pdtung1605:asia-southeast1:platform-db"
+    port: 5432
+  credentials:
+    existingSecret: db-secret-prod  # Managed by External Secrets Operator
+
+# ---- Production reliability ----
+hpa:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilization: 70
+
+pdb:
+  enabled: true
+  minAvailable: 2
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+spot:
+  enabled: false  # On-demand for prod
+
+serviceAccountName: platform-api
+
+image:
+  tag: "separate-env"

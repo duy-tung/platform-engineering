@@ -33,10 +33,34 @@ type HealthResponse struct {
 // ---- Global DB ----
 var db *sql.DB
 
+func buildDSN() string {
+	// Prefer individual env vars (big-tech pattern: avoids URL-encoding issues)
+	host := os.Getenv("DB_HOST")
+	if host != "" {
+		port := os.Getenv("DB_PORT")
+		if port == "" {
+			port = "5432"
+		}
+		user := os.Getenv("DB_USER")
+		password := os.Getenv("DB_PASSWORD")
+		dbname := os.Getenv("DB_NAME")
+		sslmode := os.Getenv("DB_SSLMODE")
+		if sslmode == "" {
+			sslmode = "disable"
+		}
+		// Use keyword=value format (no URL parsing, special chars safe)
+		return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+			host, port, user, password, dbname, sslmode)
+	}
+
+	// Fallback: DATABASE_URL for backwards compatibility
+	return os.Getenv("DATABASE_URL")
+}
+
 func initDB() {
-	dsn := os.Getenv("DATABASE_URL")
+	dsn := buildDSN()
 	if dsn == "" {
-		log.Println("⚠️  DATABASE_URL not set — DB features disabled")
+		log.Println("⚠️  DB_HOST (or DATABASE_URL) not set — DB features disabled")
 		return
 	}
 

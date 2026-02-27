@@ -1,4 +1,4 @@
-{{- if .Values.postgres.enabled }}
+{{- if and (eq .Values.database.mode "incluster") .Values.database.incluster.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -30,12 +30,12 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: {{ .Values.postgres.image }}
+          image: {{ .Values.database.incluster.image }}
           ports:
             - containerPort: 5432
           envFrom:
             - secretRef:
-                name: db-secret
+                name: {{ .Values.database.credentials.existingSecret | default "db-secret" }}
           resources:
             requests:
               cpu: 50m
@@ -49,7 +49,7 @@ spec:
               subPath: pgdata
           readinessProbe:
             exec:
-              command: ["pg_isready", "-U", {{ .Values.postgres.credentials.user | quote }}, "-d", {{ .Values.postgres.credentials.database | quote }}]
+              command: ["pg_isready", "-U", {{ .Values.database.credentials.user | quote }}, "-d", {{ .Values.database.credentials.database | quote }}]
             initialDelaySeconds: 5
             periodSeconds: 10
       {{- if .Values.spot.enabled }}
@@ -70,6 +70,6 @@ spec:
         accessModes: ["ReadWriteOnce"]
         resources:
           requests:
-            storage: {{ .Values.postgres.storageSize }}
-        storageClassName: {{ .Values.postgres.storageClass }}
+            storage: {{ .Values.database.incluster.storageSize }}
+        storageClassName: {{ .Values.database.incluster.storageClass }}
 {{- end }}

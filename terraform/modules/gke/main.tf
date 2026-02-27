@@ -68,7 +68,22 @@ variable "node_locations" {
 
 variable "enable_private_nodes" {
   type    = bool
-  default = false
+  default = true
+}
+
+variable "enable_private_endpoint" {
+  description = "If true, K8s API only accessible from VPC (no public endpoint)"
+  type        = bool
+  default     = false
+}
+
+variable "master_authorized_cidr_blocks" {
+  description = "CIDR blocks allowed to access the K8s API server"
+  type = list(object({
+    cidr_block   = string
+    display_name = string
+  }))
+  default = []
 }
 
 variable "disk_size_gb" {
@@ -94,15 +109,20 @@ resource "google_container_cluster" "cluster" {
     for_each = var.enable_private_nodes ? [1] : []
     content {
       enable_private_nodes    = true
-      enable_private_endpoint = false
+      enable_private_endpoint = var.enable_private_endpoint
       master_ipv4_cidr_block  = var.master_ipv4_cidr
     }
   }
 
   master_authorized_networks_config {
-    cidr_blocks {
-      cidr_block   = "0.0.0.0/0"
-      display_name = "all"
+    dynamic "cidr_blocks" {
+      for_each = length(var.master_authorized_cidr_blocks) > 0 ? var.master_authorized_cidr_blocks : [
+        { cidr_block = "0.0.0.0/0", display_name = "all" }
+      ]
+      content {
+        cidr_block   = cidr_blocks.value.cidr_block
+        display_name = cidr_blocks.value.display_name
+      }
     }
   }
 

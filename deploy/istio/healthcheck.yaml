@@ -1,0 +1,53 @@
+apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: kiali-healthcheck
+  namespace: istio-system
+spec:
+  default:
+    config:
+      type: HTTP
+      httpHealthCheck:
+        requestPath: /kiali/healthz
+    logConfig:
+      enabled: false
+  targetRef:
+    group: ""
+    kind: Service
+    name: kiali
+---
+apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: tracing-healthcheck
+  namespace: istio-system
+spec:
+  default:
+    config:
+      type: HTTP
+      httpHealthCheck:
+        requestPath: /
+    logConfig:
+      enabled: false
+  targetRef:
+    group: ""
+    kind: Service
+    name: tracing
+---
+apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: grafana-healthcheck
+  namespace: monitoring
+spec:
+  default:
+    config:
+      type: HTTP
+      httpHealthCheck:
+        requestPath: /api/health
+    logConfig:
+      enabled: false
+  targetRef:
+    group: ""
+    kind: Service
+    name: monitoring-grafana

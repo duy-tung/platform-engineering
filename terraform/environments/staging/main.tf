@@ -1,6 +1,6 @@
 # =============================================================================
-# Staging Environment — Zonal cluster (free tier), spot nodes
-# Hub cluster for ArgoCD
+# Staging Environment — Internal only, private cluster
+# Zonal cluster (free tier), spot nodes, ArgoCD hub
 # =============================================================================
 
 module "vpc" {
@@ -18,7 +18,7 @@ module "vpc" {
     }
   }
 
-  enable_nat = false # Public cluster, no NAT needed
+  enable_nat = true # Private nodes need NAT for outbound (pull images, etc.)
 }
 
 module "gke" {
@@ -39,6 +39,9 @@ module "gke" {
   app_node_count      = 1
   app_spot            = true
 
-  enable_private_nodes = false
-  disk_size_gb         = 30
+  # ---- Private cluster ----
+  enable_private_nodes = true
+  master_ipv4_cidr     = "172.16.0.0/28"
+
+  disk_size_gb = 30
 }

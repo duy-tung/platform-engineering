@@ -1,2 +1,13 @@
-# Staging: 1 replica, spot
+# Staging: internal only, in-cluster Postgres, 1 replica, spot
 replicaCount: 1
+
+database:
+  mode: incluster
+  incluster:
+    enabled: true
+  cloudsql:
+    enabled: false
+  credentials:
+    user: platformuser
+    password: stagingpass  # OK for staging — isolated, internal only
+    database: platformdb

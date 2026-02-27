@@ -21,6 +21,7 @@ spec:
         fsGroup: 65534
         seccompProfile:
           type: RuntimeDefault
+      serviceAccountName: {{ .Values.serviceAccountName | default "default" }}
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -30,11 +31,25 @@ spec:
           env:
             - name: PORT
               value: {{ .Values.service.targetPort | quote }}
-            - name: DATABASE_URL
+            - name: DB_HOST
+              value: "127.0.0.1"
+            - name: DB_PORT
+              value: {{ .Values.database.cloudsql.port | default 5432 | quote }}
+            - name: DB_USER
               valueFrom:
                 secretKeyRef:
-                  name: db-secret
-                  key: DATABASE_URL
+                  name: {{ .Values.database.credentials.existingSecret | default "db-secret" }}
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.credentials.existingSecret | default "db-secret" }}
+                  key: password
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.credentials.existingSecret | default "db-secret" }}
+                  key: database
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -55,6 +70,30 @@ spec:
             periodSeconds: 5
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+        {{- if .Values.database.cloudsql.enabled }}
+        # ---- Cloud SQL Auth Proxy sidecar ----
+        - name: cloud-sql-proxy
+          image: {{ .Values.database.cloudsql.image }}
+          args:
+            - {{ .Values.database.cloudsql.connectionName | quote }}
+            - "--port={{ .Values.database.cloudsql.port }}"
+            - "--private-ip"
+            - "--auto-iam-authn"
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+        {{- end }}
       {{- if .Values.spot.enabled }}
       tolerations:
         - key: "spot"
@@ -65,4 +104,13 @@ spec:
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if gt (int .Values.replicaCount) 1 }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "platform-api.selectorLabels" . | nindent 14 }}
       {{- end }}

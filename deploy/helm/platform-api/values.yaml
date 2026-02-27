@@ -19,16 +19,42 @@ resources:
     cpu: 100m
     memory: 64Mi
 
-# ---- PostgreSQL ----
-postgres:
-  enabled: true
-  image: postgres:16-alpine
-  storageSize: 10Gi
-  storageClass: standard-rwo
+# ---- Database ----
+# Mode: "incluster" (StatefulSet Postgres) or "cloudsql" (Cloud SQL Auth Proxy)
+database:
+  mode: incluster  # Override to "cloudsql" in prod
+
+  # In-cluster PostgreSQL (staging/dev)
+  incluster:
+    enabled: true
+    image: postgres:16-alpine
+    storageSize: 10Gi
+    storageClass: standard-rwo
+
+  # Cloud SQL Auth Proxy (production)
+  cloudsql:
+    enabled: false
+    connectionName: ""  # project:region:instance
+    port: 5432
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.3
+
+  # Credentials — NEVER hardcode in prod, use existingSecret
   credentials:
     user: platformuser
-    password: platformpass123
+    password: ""  # Leave empty; use existingSecret for prod
     database: platformdb
+    existingSecret: ""  # Set to secret name managed by External Secrets
+
+# ---- Reliability (Prod) ----
+hpa:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilization: 70
+
+pdb:
+  enabled: false
+  minAvailable: 2
 
 # ---- Node scheduling ----
 spot:
@@ -36,3 +62,4 @@ spot:
 
 nodeSelector:
   role: app
+
