@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -15,6 +16,9 @@ import (
 
 // Version được set lúc build bằng -ldflags
 var Version = "dev"
+
+//go:embed static
+var staticFS embed.FS
 
 // ---- Models ----
 type User struct {
@@ -121,7 +125,7 @@ func main() {
 	mux.HandleFunc("/users", handleUsers)
 	mux.HandleFunc("/users/", handleUserByID)
 
-	// ---- Root ----
+	// ---- Root: serve UI ----
 	mux.HandleFunc("/", handleRoot)
 
 	log.Printf("🚀 platform-api %s starting on :%s", Version, port)
@@ -218,20 +222,17 @@ func handleUserByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var user User
-	err := db.QueryRow("SELECT id, name, email, created_at FROM users WHERE id = $1", idStr).
-		Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt)
-	if err == sql.ErrNoRows {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "user not found"})
-		return
+	switch r.Method {
+	case http.MethodGet:
+		getUser(w, idStr)
+	case http.MethodPut:
+		updateUser(w, r, idStr)
+	case http.MethodDelete:
+		deleteUser(w, idStr)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(map[string]string{"error": "method not allowed"})
 	}
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
-		return
-	}
-	json.NewEncoder(w).Encode(user)
 }
 
 func listUsers(w http.ResponseWriter) {
@@ -252,6 +253,23 @@ func listUsers(w http.ResponseWriter) {
 		users = append(users, u)
 	}
 	json.NewEncoder(w).Encode(users)
+}
+
+func getUser(w http.ResponseWriter, idStr string) {
+	var user User
+	err := db.QueryRow("SELECT id, name, email, created_at FROM users WHERE id = $1", idStr).
+		Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt)
+	if err == sql.ErrNoRows {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "user not found"})
+		return
+	}
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	json.NewEncoder(w).Encode(user)
 }
 
 func createUser(w http.ResponseWriter, r *http.Request) {
@@ -284,16 +302,72 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(user)
 }
 
+func updateUser(w http.ResponseWriter, r *http.Request, idStr string) {
+	var input struct {
+		Name  string `json:"name"`
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+		return
+	}
+	if input.Name == "" || input.Email == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "name and email required"})
+		return
+	}
+
+	var user User
+	err := db.QueryRow(
+		"UPDATE users SET name = $1, email = $2 WHERE id = $3 RETURNING id, name, email, created_at",
+		input.Name, input.Email, idStr,
+	).Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt)
+	if err == sql.ErrNoRows {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "user not found"})
+		return
+	}
+	if err != nil {
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("could not update user: %v", err)})
+		return
+	}
+	json.NewEncoder(w).Encode(user)
+}
+
+func deleteUser(w http.ResponseWriter, idStr string) {
+	result, err := db.Exec("DELETE FROM users WHERE id = $1", idStr)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "user not found"})
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
+}
+
 func handleRoot(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"service": "platform-api",
-		"version": Version,
-		"deploy":  "ci/cd",
-		"docs":    "/health, /ready, /version, /db-check, /users",
-	})
+
+	// Serve embedded HTML UI
+	html, err := staticFS.ReadFile("static/index.html")
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"service": "platform-api",
+			"version": Version,
+		})
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(html)
 }
