@@ -3,10 +3,10 @@ name: CI/CD — Platform API
 on:
   push:
     branches: [main]
-    paths: ['apps/**', '.github/workflows/ci.yaml']
+    paths: ['apps/**', 'deploy/helm/**', '.github/workflows/ci.yaml']
   pull_request:
     branches: [main]
-    paths: ['apps/**', '.github/workflows/ci.yaml']
+    paths: ['apps/**', 'deploy/helm/**', '.github/workflows/ci.yaml']
 
 env:
   PROJECT_ID: infra-learning-pdtung1605
