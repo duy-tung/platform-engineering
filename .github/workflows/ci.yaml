@@ -99,14 +99,18 @@ jobs:
 
       - name: Smoke test
         run: |
-          echo "Waiting for rollout..."
-          sleep 15
-          STATUS=$(curl -sf --max-time 10 https://platform.duy-tung.dev/health | jq -r .status)
-          if [ "$STATUS" != "ok" ]; then
-            echo "❌ Smoke test failed: status=$STATUS"
-            exit 1
-          fi
-          echo "✅ Smoke test passed: status=$STATUS"
+          echo "Waiting for LB to register new pod..."
+          for i in $(seq 1 10); do
+            STATUS=$(curl -sf --max-time 10 https://platform.duy-tung.dev/health | jq -r .status 2>/dev/null || echo "")
+            if [ "$STATUS" = "ok" ]; then
+              echo "✅ Smoke test passed on attempt $i"
+              exit 0
+            fi
+            echo "Attempt $i/10: status=$STATUS, retrying in 15s..."
+            sleep 15
+          done
+          echo "❌ Smoke test failed after 10 attempts"
+          exit 1
 
       # ── Update image tag in repo ──
       - name: Update values-prod.yaml image tag
