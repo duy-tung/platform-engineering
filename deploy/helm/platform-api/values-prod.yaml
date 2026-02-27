@@ -37,4 +37,4 @@ spot:
 serviceAccountName: platform-api
 
 image:
-  tag: "021a5ebf"
+  tag: "45981a6c"

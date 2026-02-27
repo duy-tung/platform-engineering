@@ -3,7 +3,7 @@ replicaCount: 1
 
 image:
   repository: asia-southeast1-docker.pkg.dev/infra-learning-pdtung1605/platform-images/platform-api
-  tag: "87980d2f"
+  tag: "45981a6c"
   pullPolicy: IfNotPresent
 
 service:
