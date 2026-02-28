@@ -11,6 +11,7 @@ spec:
       chart: kube-prometheus-stack
       targetRevision: "82.4.0"
       helm:
+        skipCrds: true
         valueFiles:
           - $values/deploy/helm/monitoring/values-prometheus.yaml
     # Git repo providing values file
@@ -27,3 +28,4 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true
