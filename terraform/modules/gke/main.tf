@@ -97,6 +97,24 @@ variable "enable_dataplane_v2" {
   default     = false
 }
 
+variable "workload_identity_sa_name" {
+  description = "Name of the GCP Service Account for Workload Identity (platform-api pods)"
+  type        = string
+  default     = ""
+}
+
+variable "workload_identity_namespace" {
+  description = "K8s namespace for Workload Identity binding"
+  type        = string
+  default     = "production"
+}
+
+variable "workload_identity_ksa" {
+  description = "K8s ServiceAccount name for Workload Identity binding"
+  type        = string
+  default     = "platform-api"
+}
+
 # ---- Cluster ----
 resource "google_container_cluster" "cluster" {
   name     = var.cluster_name
@@ -104,6 +122,13 @@ resource "google_container_cluster" "cluster" {
   project  = var.project_id
 
   datapath_provider = var.enable_dataplane_v2 ? "ADVANCED_DATAPATH" : "LEGACY_DATAPATH"
+
+  dynamic "gateway_api_config" {
+    for_each = var.enable_dataplane_v2 ? [1] : []
+    content {
+      channel = "CHANNEL_STANDARD"
+    }
+  }
 
   remove_default_node_pool = true
   initial_node_count       = 1
@@ -240,6 +265,28 @@ resource "google_container_node_pool" "app" {
   }
 }
 
+# ---- Workload Identity (Gap 4) ----
+resource "google_service_account" "workload_identity" {
+  count        = var.workload_identity_sa_name != "" ? 1 : 0
+  project      = var.project_id
+  account_id   = var.workload_identity_sa_name
+  display_name = "Workload Identity SA for ${var.cluster_name}"
+}
+
+resource "google_project_iam_member" "workload_identity_cloudsql" {
+  count   = var.workload_identity_sa_name != "" ? 1 : 0
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.workload_identity[0].email}"
+}
+
+resource "google_service_account_iam_member" "workload_identity_binding" {
+  count              = var.workload_identity_sa_name != "" ? 1 : 0
+  service_account_id = google_service_account.workload_identity[0].name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "serviceAccount:${var.project_id}.svc.id.goog[${var.workload_identity_namespace}/${var.workload_identity_ksa}]"
+}
+
 # ---- Outputs ----
 output "cluster_name" {
   value = google_container_cluster.cluster.name
@@ -252,4 +299,8 @@ output "cluster_endpoint" {
 
 output "cluster_id" {
   value = google_container_cluster.cluster.id
+}
+
+output "workload_identity_sa_email" {
+  value = var.workload_identity_sa_name != "" ? google_service_account.workload_identity[0].email : ""
 }

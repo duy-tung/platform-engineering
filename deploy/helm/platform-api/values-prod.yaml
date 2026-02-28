@@ -37,6 +37,9 @@ spot:
   enabled: false  # On-demand for prod
 
 serviceAccountName: platform-api
+serviceAccount:
+  annotations:
+    iam.gke.io/gcp-service-account: platform-api-wi@infra-learning-pdtung1605.iam.gserviceaccount.com
 
 image:
   tag: "38ceae1d"

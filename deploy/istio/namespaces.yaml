@@ -1,0 +1,15 @@
+# Namespaces with Istio Ambient labels
+# ArgoCD syncs this via istio-config app (deploy/istio/ path)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: production
+  labels:
+    istio.io/dataplane-mode: ambient
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    istio.io/dataplane-mode: ambient

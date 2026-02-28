@@ -63,3 +63,7 @@ spot:
 nodeSelector:
   role: app
 
+# ---- ServiceAccount ----
+serviceAccountName: ""
+serviceAccount:
+  annotations: {}

@@ -47,6 +47,11 @@ module "gke" {
   disk_size_gb = 30
 
   enable_dataplane_v2 = true
+
+  # Workload Identity — auto-create GCP SA + IAM bindings
+  workload_identity_sa_name   = "platform-api-wi"
+  workload_identity_namespace = "production"
+  workload_identity_ksa       = "platform-api"
 }
 
 # ---- Private Service Connection (for Cloud SQL private IP) ----
