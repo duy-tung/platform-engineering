@@ -51,6 +51,10 @@ module "gke" {
   # Istio Ambient — platform-managed via Terraform (not ArgoCD)
   enable_istio_ambient = true
 
+  # ArgoCD — platform-managed via Terraform
+  enable_argocd         = true
+  argocd_webhook_secret = var.argocd_webhook_secret
+
   # Workload Identity — auto-create GCP SA + IAM bindings
   workload_identity_sa_name   = "platform-api-wi"
   workload_identity_namespace = "production"
