@@ -11,6 +11,13 @@ spec:
     path: deploy/istio
   destination:
     server: https://kubernetes.default.svc
+  ignoreDifferences:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      jqPathExpressions:
+        - .spec.rules[]?.backendRefs[]?  | .group, .kind, .weight
+        - .spec.parentRefs[]? | .group, .kind, .sectionName
+        - .spec.rules[]?.matches[]? | .headers, .queryParams
   syncPolicy:
     automated:
       prune: true
@@ -19,3 +26,4 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
       - ServerSideDiff=true
+      - RespectIgnoreDifferences=true
