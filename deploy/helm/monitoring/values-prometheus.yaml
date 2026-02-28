@@ -85,3 +85,10 @@ kube-state-metrics:
     limits:
       cpu: 100m
       memory: 128Mi
+
+# Disable admission webhook patch/create Jobs — they block ArgoCD sync
+# on resource-constrained clusters (Job pod can't schedule)
+prometheusOperator:
+  admissionWebhooks:
+    patch:
+      enabled: false
