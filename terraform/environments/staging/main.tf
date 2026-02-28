@@ -44,4 +44,6 @@ module "gke" {
   master_ipv4_cidr     = "172.16.0.0/28"
 
   disk_size_gb = 30
+
+  enable_dataplane_v2 = true
 }

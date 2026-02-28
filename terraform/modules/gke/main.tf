@@ -91,11 +91,19 @@ variable "disk_size_gb" {
   default = 30
 }
 
+variable "enable_dataplane_v2" {
+  description = "Enable GKE Dataplane V2 (Cilium/eBPF). Replaces Calico for network policy. Requires cluster recreation."
+  type        = bool
+  default     = false
+}
+
 # ---- Cluster ----
 resource "google_container_cluster" "cluster" {
   name     = var.cluster_name
   location = var.location
   project  = var.project_id
+
+  datapath_provider = var.enable_dataplane_v2 ? "ADVANCED_DATAPATH" : "LEGACY_DATAPATH"
 
   remove_default_node_pool = true
   initial_node_count       = 1
@@ -135,9 +143,12 @@ resource "google_container_cluster" "cluster" {
     workload_pool = "${var.project_id}.svc.id.goog"
   }
 
-  network_policy {
-    enabled  = true
-    provider = "CALICO"
+  dynamic "network_policy" {
+    for_each = var.enable_dataplane_v2 ? [] : [1]
+    content {
+      enabled  = true
+      provider = "CALICO"
+    }
   }
 
   addons_config {
@@ -150,8 +161,11 @@ resource "google_container_cluster" "cluster" {
     gce_persistent_disk_csi_driver_config {
       enabled = true
     }
-    network_policy_config {
-      disabled = false
+    dynamic "network_policy_config" {
+      for_each = var.enable_dataplane_v2 ? [] : [1]
+      content {
+        disabled = false
+      }
     }
   }
 
