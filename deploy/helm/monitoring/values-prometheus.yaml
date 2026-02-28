@@ -90,5 +90,4 @@ kube-state-metrics:
 # on resource-constrained clusters (Job pod can't schedule)
 prometheusOperator:
   admissionWebhooks:
-    patch:
-      enabled: false
+    enabled: false
