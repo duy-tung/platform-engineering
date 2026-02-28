@@ -1,3 +1,5 @@
+# Root App for PROD cluster
+# kubectl apply -f on prod-cluster to bootstrap all prod workloads
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -8,7 +10,7 @@ spec:
   source:
     repoURL: https://github.com/duy-tung/platform-engineering.git
     targetRevision: main
-    path: deploy/argocd/applications
+    path: deploy/argocd/envs/prod
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
