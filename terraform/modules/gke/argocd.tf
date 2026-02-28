@@ -62,8 +62,8 @@ resource "helm_release" "argocd" {
     # Resource limits for e2-standard-2 nodes
     controller = {
       resources = {
-        requests = { cpu = "100m", memory = "256Mi" }
-        limits   = { cpu = "500m", memory = "512Mi" }
+        requests = { cpu = "100m", memory = "512Mi" }
+        limits   = { cpu = "500m", memory = "1Gi" }
       }
     }
     server = {

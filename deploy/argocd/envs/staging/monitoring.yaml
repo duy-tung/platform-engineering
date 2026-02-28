@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    # Helm chart from upstream repo
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: "82.4.0"
+      helm:
+        skipCrds: false
+        valueFiles:
+          - $values/deploy/helm/monitoring/values-prometheus.yaml
+    # Git repo providing values file
+    - repoURL: https://github.com/duy-tung/platform-engineering.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - ServerSideDiff=true
+      - RespectIgnoreDifferences=true

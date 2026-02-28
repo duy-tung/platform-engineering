@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istio-config
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/duy-tung/platform-engineering.git
+    targetRevision: main
+    path: deploy/istio
+  destination:
+    server: https://kubernetes.default.svc
+  ignoreDifferences:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      jqPathExpressions:
+        - .spec.rules[]?.backendRefs[]?  | .group, .kind, .weight
+        - .spec.parentRefs[]? | .group, .kind, .sectionName
+        - .spec.rules[]?.matches[]? | .headers, .queryParams
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - ServerSideDiff=true
+      - RespectIgnoreDifferences=true

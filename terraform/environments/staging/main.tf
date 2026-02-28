@@ -46,4 +46,10 @@ module "gke" {
   disk_size_gb = 30
 
   enable_dataplane_v2 = true
+
+  # Istio Ambient — platform-managed via Terraform (not ArgoCD)
+  enable_istio_ambient = true
+
+  # ArgoCD — platform-managed via Terraform
+  enable_argocd = true
 }

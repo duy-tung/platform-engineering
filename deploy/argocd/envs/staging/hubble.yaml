@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: hubble
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/duy-tung/platform-engineering.git
+    targetRevision: main
+    path: deploy/hubble
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gke-managed-dpv2-observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
