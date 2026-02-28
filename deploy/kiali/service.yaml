@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    cloud.google.com/neg: '{"exposed_ports":{"20001":{}}}'
+    cloud.google.com/neg-status: '{"network_endpoint_groups":{"20001":"k8s1-2beee262-istio-system-kiali-20001-0ed04455"},"zones":["asia-southeast1-a","asia-southeast1-b"]}'
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"labels":{"app":"kiali","app.kubernetes.io/instance":"kiali","app.kubernetes.io/name":"kiali","app.kubernetes.io/part-of":"kiali","app.kubernetes.io/version":"v2.21.0","helm.sh/chart":"kiali-server-2.21.0","version":"v2.21.0"},"name":"kiali","namespace":"istio-system"},"spec":{"ports":[{"appProtocol":"http","name":"http","port":20001,"protocol":"TCP"},{"appProtocol":"http","name":"http-metrics","port":9090,"protocol":"TCP"}],"selector":{"app.kubernetes.io/instance":"kiali","app.kubernetes.io/name":"kiali"}}}
+  creationTimestamp: "2026-02-26T23:50:02Z"
+  labels:
+    app: kiali
+    app.kubernetes.io/instance: kiali
+    app.kubernetes.io/name: kiali
+    app.kubernetes.io/part-of: kiali
+    app.kubernetes.io/version: v2.21.0
+    helm.sh/chart: kiali-server-2.21.0
+    version: v2.21.0
+  name: kiali
+  namespace: istio-system
+  resourceVersion: "1772152879411343018"
+  uid: 05fe9c89-e321-4226-af28-332f6b0de6b0
+spec:
+  clusterIP: 10.60.7.243
+  clusterIPs:
+  - 10.60.7.243
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - appProtocol: http
+    name: http
+    port: 20001
+    protocol: TCP
+    targetPort: 20001
+  - appProtocol: http
+    name: http-metrics
+    port: 9090
+    protocol: TCP
+    targetPort: 9090
+  selector:
+    app.kubernetes.io/instance: kiali
+    app.kubernetes.io/name: kiali
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}

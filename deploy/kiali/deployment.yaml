@@ -1,0 +1,193 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "3"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app":"kiali","app.kubernetes.io/instance":"kiali","app.kubernetes.io/name":"kiali","app.kubernetes.io/part-of":"kiali","app.kubernetes.io/version":"v2.21.0","helm.sh/chart":"kiali-server-2.21.0","version":"v2.21.0"},"name":"kiali","namespace":"istio-system"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/instance":"kiali","app.kubernetes.io/name":"kiali"}},"strategy":{"rollingUpdate":{"maxSurge":1,"maxUnavailable":1},"type":"RollingUpdate"},"template":{"metadata":{"annotations":{"checksum/config":"35ac15457de3a25040e953fa6178396e95991865aed21cb1bd8c131c5d3a81c7","kiali.io/dashboards":"go,kiali","prometheus.io/port":"9090","prometheus.io/scheme":"http","prometheus.io/scrape":"true","proxy.istio.io/config":"{ \"holdApplicationUntilProxyStarts\": true }"},"labels":{"app":"kiali","app.kubernetes.io/instance":"kiali","app.kubernetes.io/name":"kiali","app.kubernetes.io/part-of":"kiali","app.kubernetes.io/version":"v2.21.0","helm.sh/chart":"kiali-server-2.21.0","sidecar.istio.io/inject":"false","version":"v2.21.0"},"name":"kiali"},"spec":{"containers":[{"command":["/opt/kiali/kiali","-config","/kiali-configuration/config.yaml"],"env":[{"name":"ACTIVE_NAMESPACE","valueFrom":{"fieldRef":{"fieldPath":"metadata.namespace"}}},{"name":"LOG_LEVEL","value":"info"},{"name":"LOG_FORMAT","value":"text"},{"name":"LOG_TIME_FIELD_FORMAT","value":"2006-01-02T15:04:05Z07:00"},{"name":"LOG_SAMPLER_RATE","value":"1"}],"image":"quay.io/kiali/kiali:v2.21","imagePullPolicy":"IfNotPresent","livenessProbe":{"httpGet":{"path":"/kiali/healthz","port":"api-port","scheme":"HTTP"},"initialDelaySeconds":5,"periodSeconds":30},"name":"kiali","ports":[{"containerPort":20001,"name":"api-port"},{"containerPort":9090,"name":"http-metrics"}],"readinessProbe":{"httpGet":{"path":"/kiali/healthz","port":"api-port","scheme":"HTTP"},"initialDelaySeconds":5,"periodSeconds":30},"resources":{"limits":{"memory":"1Gi"},"requests":{"cpu":"10m","memory":"64Mi"}},"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"privileged":false,"readOnlyRootFilesystem":true,"runAsNonRoot":true},"startupProbe":{"failureThreshold":6,"httpGet":{"path":"/kiali/healthz","port":"api-port","scheme":"HTTP"},"initialDelaySeconds":30,"periodSeconds":10},"terminationMessagePolicy":"FallbackToLogsOnError","volumeMounts":[{"mountPath":"/kiali-configuration","name":"kiali-configuration"},{"mountPath":"/kiali-cert","name":"kiali-cert"},{"mountPath":"/kiali-secret","name":"kiali-secret"},{"mountPath":"/kiali-cabundle","name":"kiali-cabundle"},{"mountPath":"/kiali-remote-cluster-secrets/kiali-multi-cluster-secret","name":"kiali-multi-cluster-secret","readOnly":true}]}],"serviceAccountName":"kiali","volumes":[{"configMap":{"name":"kiali"},"name":"kiali-configuration"},{"name":"kiali-cert","secret":{"optional":true,"secretName":"istio.kiali-service-account"}},{"name":"kiali-secret","secret":{"optional":true,"secretName":"kiali"}},{"configMap":{"name":"kiali-cabundle","optional":true},"name":"kiali-cabundle"},{"name":"kiali-multi-cluster-secret","secret":{"optional":true,"secretName":"kiali-multi-cluster-secret"}}]}}}}
+  creationTimestamp: "2026-02-26T23:50:02Z"
+  generation: 3
+  labels:
+    app: kiali
+    app.kubernetes.io/instance: kiali
+    app.kubernetes.io/name: kiali
+    app.kubernetes.io/part-of: kiali
+    app.kubernetes.io/version: v2.21.0
+    helm.sh/chart: kiali-server-2.21.0
+    version: v2.21.0
+  name: kiali
+  namespace: istio-system
+  resourceVersion: "1772252360828511000"
+  uid: 43acbfbb-e899-4c62-becb-44fc6b6c12b9
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: kiali
+      app.kubernetes.io/name: kiali
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        checksum/config: 35ac15457de3a25040e953fa6178396e95991865aed21cb1bd8c131c5d3a81c7
+        kiali.io/dashboards: go,kiali
+        kubectl.kubernetes.io/restartedAt: "2026-02-28T11:18:37+07:00"
+        prometheus.io/port: "9090"
+        prometheus.io/scheme: http
+        prometheus.io/scrape: "true"
+        proxy.istio.io/config: '{ "holdApplicationUntilProxyStarts": true }'
+      labels:
+        app: kiali
+        app.kubernetes.io/instance: kiali
+        app.kubernetes.io/name: kiali
+        app.kubernetes.io/part-of: kiali
+        app.kubernetes.io/version: v2.21.0
+        helm.sh/chart: kiali-server-2.21.0
+        sidecar.istio.io/inject: "false"
+        version: v2.21.0
+      name: kiali
+    spec:
+      containers:
+      - command:
+        - /opt/kiali/kiali
+        - -config
+        - /kiali-configuration/config.yaml
+        env:
+        - name: ACTIVE_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: LOG_LEVEL
+          value: info
+        - name: LOG_FORMAT
+          value: text
+        - name: LOG_TIME_FIELD_FORMAT
+          value: 2006-01-02T15:04:05Z07:00
+        - name: LOG_SAMPLER_RATE
+          value: "1"
+        image: quay.io/kiali/kiali:v2.21
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /kiali/healthz
+            port: api-port
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: kiali
+        ports:
+        - containerPort: 20001
+          name: api-port
+          protocol: TCP
+        - containerPort: 9090
+          name: http-metrics
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /kiali/healthz
+            port: api-port
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          limits:
+            memory: 1Gi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+        startupProbe:
+          failureThreshold: 6
+          httpGet:
+            path: /kiali/healthz
+            port: api-port
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /kiali-configuration
+          name: kiali-configuration
+        - mountPath: /kiali-cert
+          name: kiali-cert
+        - mountPath: /kiali-secret
+          name: kiali-secret
+        - mountPath: /kiali-cabundle
+          name: kiali-cabundle
+        - mountPath: /kiali-remote-cluster-secrets/kiali-multi-cluster-secret
+          name: kiali-multi-cluster-secret
+          readOnly: true
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: kiali
+      serviceAccountName: kiali
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: kiali
+        name: kiali-configuration
+      - name: kiali-cert
+        secret:
+          defaultMode: 420
+          optional: true
+          secretName: istio.kiali-service-account
+      - name: kiali-secret
+        secret:
+          defaultMode: 420
+          optional: true
+          secretName: kiali
+      - configMap:
+          defaultMode: 420
+          name: kiali-cabundle
+          optional: true
+        name: kiali-cabundle
+      - name: kiali-multi-cluster-secret
+        secret:
+          defaultMode: 420
+          optional: true
+          secretName: kiali-multi-cluster-secret
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-02-26T23:50:02Z"
+    lastUpdateTime: "2026-02-26T23:50:02Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-02-26T23:50:02Z"
+    lastUpdateTime: "2026-02-28T04:19:20Z"
+    message: ReplicaSet "kiali-54496b598b" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
