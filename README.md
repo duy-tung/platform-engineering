@@ -91,4 +91,3 @@ git commit -m "scale to 2 replicas" && git push
 ## Tech Stack
 
 Terraform · GKE · Helm · ArgoCD · Istio · GitHub Actions · Go · Docker · Cloud SQL · HTTPS
-# Webhook test 1772289815
