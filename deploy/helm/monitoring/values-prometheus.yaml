@@ -25,6 +25,23 @@ prometheus:
 
 grafana:
   adminPassword: "admin"  # Change in prod
+  # Serve Grafana under /grafana sub-path behind GKE L7 LB
+  grafana.ini:
+    server:
+      domain: platform.duy-tung.dev
+      root_url: "%(protocol)s://%(domain)s/grafana/"
+      serve_from_sub_path: true
+  # Probes must use sub-path
+  readinessProbe:
+    httpGet:
+      path: /grafana/api/health
+      port: 3000
+  livenessProbe:
+    httpGet:
+      path: /grafana/api/health
+      port: 3000
+    initialDelaySeconds: 60
+    timeoutSeconds: 30
   resources:
     requests:
       cpu: 50m
