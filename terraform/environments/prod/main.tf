@@ -48,6 +48,9 @@ module "gke" {
 
   enable_dataplane_v2 = true
 
+  # Istio Ambient — platform-managed via Terraform (not ArgoCD)
+  enable_istio_ambient = true
+
   # Workload Identity — auto-create GCP SA + IAM bindings
   workload_identity_sa_name   = "platform-api-wi"
   workload_identity_namespace = "production"
