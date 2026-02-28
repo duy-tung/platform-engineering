@@ -27,18 +27,16 @@ module "gke" {
   cluster_name = "prod-cluster"
   location     = var.region # Regional → HA control plane (3 zones)
 
-  # Multi-zone nodes for HA (big-tech: ≥2 zones)
-  node_locations = ["${var.region}-a", "${var.region}-b"]
-
+  # Single pool, 3 nodes across 3 zones (regional auto-distributes)
   network    = module.vpc.vpc_name
   subnetwork = module.vpc.subnet_names["prod-subnet"]
 
   pods_range_name     = "prod-pods"
   services_range_name = "prod-services"
 
-  system_machine_type = "e2-medium"
-  system_node_count   = 1
-  app_machine_type    = "e2-medium"
+  system_machine_type = "e2-standard-2"
+  system_node_count   = 0
+  app_machine_type    = "e2-standard-2"
   app_node_count      = 1
   app_spot            = false # On-demand for prod reliability
 

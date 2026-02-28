@@ -224,10 +224,13 @@ resource "google_container_node_pool" "app" {
     oauth_scopes = ["https://www.googleapis.com/auth/cloud-platform"]
     labels       = { role = "app" }
 
-    taint {
-      key    = "spot"
-      value  = "true"
-      effect = "PREFER_NO_SCHEDULE"
+    dynamic "taint" {
+      for_each = var.app_spot ? [1] : []
+      content {
+        key    = "spot"
+        value  = "true"
+        effect = "PREFER_NO_SCHEDULE"
+      }
     }
   }
 
