@@ -79,6 +79,7 @@ spec:
         global:
           platform: gke
         cni:
+          cniBinDir: /home/kubernetes/bin
           resources:
             requests:
               cpu: 10m
