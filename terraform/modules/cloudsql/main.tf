@@ -136,6 +136,15 @@ output "database_name" {
   value = google_sql_database.db.name
 }
 
+output "username" {
+  value = google_sql_user.user.name
+}
+
+output "password" {
+  value     = random_password.db_password.result
+  sensitive = true
+}
+
 output "password_secret_id" {
   value = google_secret_manager_secret.db_password.secret_id
 }

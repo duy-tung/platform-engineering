@@ -83,3 +83,29 @@ module "cloudsql" {
   vpc_id                        = module.vpc.vpc_id
   private_service_connection_id = google_service_networking_connection.private_vpc.id
 }
+
+# ---- K8s DB Secret (Gap 6: auto-create from Cloud SQL credentials) ----
+resource "kubernetes_namespace" "production" {
+  metadata {
+    name = "production"
+    labels = {
+      "istio.io/dataplane-mode" = "ambient"
+    }
+  }
+  lifecycle {
+    ignore_changes = [metadata[0].labels, metadata[0].annotations]
+  }
+}
+
+resource "kubernetes_secret" "db_secret_prod" {
+  metadata {
+    name      = "db-secret-prod"
+    namespace = kubernetes_namespace.production.metadata[0].name
+  }
+  data = {
+    username     = module.cloudsql.username
+    password     = module.cloudsql.password
+    database     = module.cloudsql.database_name
+    DATABASE_URL = "host=localhost port=5432 user=${module.cloudsql.username} password=${module.cloudsql.password} dbname=${module.cloudsql.database_name} sslmode=disable"
+  }
+}

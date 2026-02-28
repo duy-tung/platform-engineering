@@ -304,3 +304,8 @@ output "cluster_id" {
 output "workload_identity_sa_email" {
   value = var.workload_identity_sa_name != "" ? google_service_account.workload_identity[0].email : ""
 }
+
+output "cluster_ca_certificate" {
+  value     = google_container_cluster.cluster.master_auth[0].cluster_ca_certificate
+  sensitive = true
+}
