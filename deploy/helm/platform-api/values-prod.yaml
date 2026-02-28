@@ -42,4 +42,4 @@ serviceAccount:
     iam.gke.io/gcp-service-account: platform-api-wi@infra-learning-pdtung1605.iam.gserviceaccount.com
 
 image:
-  tag: "38ceae1d"
+  tag: "a18b68dc"
