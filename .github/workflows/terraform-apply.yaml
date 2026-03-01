@@ -68,6 +68,7 @@ jobs:
       - name: Terraform Apply
         run: |
           terraform -chdir=terraform/environments/staging apply \
+            -var="project_id=${{ env.PROJECT_ID }}" \
             -auto-approve -input=false
 
   # ─── Apply prod (only if prod files changed) ─────────
@@ -104,4 +105,5 @@ jobs:
           TF_VAR_argocd_webhook_secret: ${{ secrets.ARGOCD_WEBHOOK_SECRET }}
         run: |
           terraform -chdir=terraform/environments/prod apply \
+            -var="project_id=${{ env.PROJECT_ID }}" \
             -auto-approve -input=false
