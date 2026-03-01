@@ -1,0 +1,15 @@
+# Namespaces with Istio Ambient labels — staging
+# No Gateway/HTTPRoutes (staging doesn't need external LB)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: staging
+  labels:
+    istio.io/dataplane-mode: ambient
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    istio.io/dataplane-mode: ambient

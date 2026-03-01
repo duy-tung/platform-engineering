@@ -33,9 +33,9 @@ module "gke" {
   pods_range_name     = "staging-pods"
   services_range_name = "staging-services"
 
-  system_machine_type = "e2-standard-2"
+  system_machine_type = "e2-medium"
   system_node_count   = 0
-  app_machine_type    = "e2-standard-2"
+  app_machine_type    = "e2-medium"
   app_node_count      = 1
   app_spot            = true
 

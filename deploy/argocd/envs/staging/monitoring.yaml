@@ -14,6 +14,7 @@ spec:
         skipCrds: false
         valueFiles:
           - $values/deploy/helm/monitoring/values-prometheus.yaml
+          - $values/deploy/helm/monitoring/values-prometheus-staging.yaml
     # Git repo providing values file
     - repoURL: https://github.com/duy-tung/platform-engineering.git
       targetRevision: main

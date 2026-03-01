@@ -16,6 +16,12 @@ variable "istio_version" {
   default     = "1.29.0"
 }
 
+variable "istio_istiod_replicas" {
+  description = "Number of istiod replicas (1 for staging, 2+ for prod)"
+  type        = number
+  default     = 1
+}
+
 # ---- Namespace ----
 resource "kubernetes_namespace" "istio_system" {
   count = var.enable_istio_ambient ? 1 : 0
@@ -56,6 +62,7 @@ resource "helm_release" "istiod" {
       platform = "gke"
     }
     pilot = {
+      replicaCount = var.istio_istiod_replicas
       env = {
         PILOT_ENABLE_AMBIENT = "true"
       }
