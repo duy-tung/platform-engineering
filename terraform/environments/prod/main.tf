@@ -38,7 +38,7 @@ module "gke" {
   system_node_count   = 0
   app_machine_type    = "e2-standard-2"
   app_node_count      = 1
-  app_spot            = false # On-demand for prod reliability
+  app_spot            = true # Spot VMs — HA maintained via regional multi-zone (2 nodes, different zones)
 
   # ---- Private cluster ----
   enable_private_nodes = true
