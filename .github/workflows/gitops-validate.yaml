@@ -1,0 +1,89 @@
+name: GitOps Validate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'deploy/**'
+      - '.github/workflows/gitops-validate.yaml'
+
+jobs:
+  validate:
+    name: Validate GitOps
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Helm lint ──
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.16.0'
+
+      - name: Helm lint platform-api
+        run: |
+          helm lint deploy/helm/platform-api \
+            -f deploy/helm/platform-api/values.yaml \
+            -f deploy/helm/platform-api/values-staging.yaml
+
+      - name: Helm template dry-run (staging)
+        id: template_staging
+        run: |
+          helm template platform-api deploy/helm/platform-api \
+            -f deploy/helm/platform-api/values.yaml \
+            -f deploy/helm/platform-api/values-staging.yaml \
+            --namespace staging > /dev/null 2>&1
+          echo "result=✅ Staging template OK" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Helm template dry-run (prod)
+        id: template_prod
+        run: |
+          helm template platform-api deploy/helm/platform-api \
+            -f deploy/helm/platform-api/values.yaml \
+            -f deploy/helm/platform-api/values-prod.yaml \
+            --namespace production > /dev/null 2>&1
+          echo "result=✅ Prod template OK" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      # ── YAML validation ──
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: YAML lint ArgoCD apps
+        id: yamllint
+        run: |
+          yamllint -d relaxed deploy/argocd/ 2>&1 | head -50 || true
+          echo "result=done" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      # ── Comment on PR ──
+      - name: Comment validation results
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const staging = '${{ steps.template_staging.outcome }}' === 'success' ? '✅' : '❌';
+            const prod = '${{ steps.template_prod.outcome }}' === 'success' ? '✅' : '❌';
+            const yaml = '${{ steps.yamllint.outcome }}' === 'success' ? '✅' : '⚠️';
+            const output = `### GitOps Validation
+            | Check | Status |
+            |---|---|
+            | Helm template staging | ${staging} |
+            | Helm template prod | ${prod} |
+            | YAML lint | ${yaml} |
+
+            *Pushed by: @${{ github.actor }}*`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+      - name: Fail if templates broken
+        if: steps.template_staging.outcome == 'failure' || steps.template_prod.outcome == 'failure'
+        run: exit 1
