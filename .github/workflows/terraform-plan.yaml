@@ -79,6 +79,7 @@ jobs:
         id: plan
         run: |
           terraform -chdir=terraform/environments/staging plan \
+            -var="project_id=${{ env.PROJECT_ID }}" \
             -lock-timeout=60s \
             -no-color -out=tfplan 2>&1 | tee plan.txt
         continue-on-error: true
@@ -151,6 +152,7 @@ jobs:
           TF_VAR_argocd_webhook_secret: ${{ secrets.ARGOCD_WEBHOOK_SECRET }}
         run: |
           terraform -chdir=terraform/environments/prod plan \
+            -var="project_id=${{ env.PROJECT_ID }}" \
             -lock-timeout=60s \
             -no-color -out=tfplan 2>&1 | tee plan.txt
         continue-on-error: true
