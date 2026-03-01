@@ -130,6 +130,8 @@ jobs:
 
       - name: Terraform Plan
         id: plan
+        env:
+          TF_VAR_argocd_webhook_secret: ${{ secrets.ARGOCD_WEBHOOK_SECRET }}
         run: |
           terraform -chdir=terraform/environments/prod plan \
             -var="project_id=${{ env.PROJECT_ID }}" \
