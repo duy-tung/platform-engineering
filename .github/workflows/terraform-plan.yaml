@@ -3,9 +3,6 @@ name: Terraform Plan
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'terraform/**'
-      - '.github/workflows/terraform-plan.yaml'
 
 env:
   TF_VERSION: '1.9.0'
@@ -29,11 +26,9 @@ jobs:
           filters: |
             staging:
               - 'terraform/environments/staging/**'
-              - 'terraform/modules/**'
               - '.github/workflows/terraform-plan.yaml'
             prod:
               - 'terraform/environments/prod/**'
-              - 'terraform/modules/**'
               - '.github/workflows/terraform-plan.yaml'
 
   # ─── Plan staging (only if staging files changed) ─────
