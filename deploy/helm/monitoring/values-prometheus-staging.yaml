@@ -5,8 +5,8 @@ prometheus:
     retention: 2d
     resources:
       requests:
-        cpu: 50m
-        memory: 128Mi
+        cpu: 25m
+        memory: 64Mi
       limits:
         cpu: 300m
         memory: 256Mi
@@ -21,8 +21,8 @@ prometheus:
 grafana:
   resources:
     requests:
-      cpu: 25m
-      memory: 64Mi
+      cpu: 10m
+      memory: 32Mi
     limits:
       cpu: 100m
       memory: 128Mi
@@ -31,8 +31,8 @@ alertmanager:
   alertmanagerSpec:
     resources:
       requests:
-        cpu: 5m
-        memory: 16Mi
+        cpu: 2m
+        memory: 8Mi
       limits:
         cpu: 50m
         memory: 32Mi

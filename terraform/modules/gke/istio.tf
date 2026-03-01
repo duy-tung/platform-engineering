@@ -68,7 +68,7 @@ resource "helm_release" "istiod" {
       }
     }
     resources = {
-      requests = { cpu = "50m", memory = "128Mi" }
+      requests = { cpu = "10m", memory = "64Mi" }
       limits   = { cpu = "500m", memory = "256Mi" }
     }
   })]
@@ -94,7 +94,7 @@ resource "helm_release" "istio_cni" {
     cni = {
       cniBinDir = "/home/kubernetes/bin"
       resources = {
-        requests = { cpu = "10m", memory = "64Mi" }
+        requests = { cpu = "5m", memory = "32Mi" }
         limits   = { cpu = "100m", memory = "128Mi" }
       }
     }
@@ -118,7 +118,7 @@ resource "helm_release" "ztunnel" {
       platform = "gke"
     }
     resources = {
-      requests = { cpu = "10m", memory = "64Mi" }
+      requests = { cpu = "5m", memory = "32Mi" }
       limits   = { cpu = "200m", memory = "128Mi" }
     }
   })]
