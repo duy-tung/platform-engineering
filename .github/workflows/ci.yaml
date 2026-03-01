@@ -6,6 +6,7 @@ on:
     paths: ['apps/**', '.github/workflows/ci.yaml']
   pull_request:
     branches: [main]
+    paths: ['apps/**', 'deploy/helm/**', '.github/workflows/ci.yaml']
 
 env:
   PROJECT_ID: infra-learning-pdtung1605
