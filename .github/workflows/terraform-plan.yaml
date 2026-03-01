@@ -12,11 +12,35 @@ env:
   PROJECT_ID: 'infra-learning-pdtung1605'
 
 jobs:
-  plan:
-    strategy:
-      matrix:
-        env: [staging, prod]
-    name: Plan ${{ matrix.env }}
+  # ─── Detect which environments changed ────────────────
+  detect:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      staging: ${{ steps.filter.outputs.staging }}
+      prod: ${{ steps.filter.outputs.prod }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            staging:
+              - 'terraform/environments/staging/**'
+              - 'terraform/modules/**'
+              - '.github/workflows/terraform-plan.yaml'
+            prod:
+              - 'terraform/environments/prod/**'
+              - 'terraform/modules/**'
+              - '.github/workflows/terraform-plan.yaml'
+
+  # ─── Plan staging (only if staging files changed) ─────
+  plan-staging:
+    name: Plan staging
+    needs: detect
+    if: needs.detect.outputs.staging == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -36,23 +60,24 @@ jobs:
           workload_identity_provider: 'projects/866925958777/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
           service_account: 'github-actions@infra-learning-pdtung1605.iam.gserviceaccount.com'
 
-      # Security scan
       - name: tfsec scan
         uses: aquasecurity/tfsec-action@v1.0.3
         with:
           working_directory: terraform/
           soft_fail: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Terraform Init
-        run: terraform -chdir=terraform/environments/${{ matrix.env }} init -input=false
+        run: terraform -chdir=terraform/environments/staging init -input=false
 
       - name: Terraform Validate
-        run: terraform -chdir=terraform/environments/${{ matrix.env }} validate
+        run: terraform -chdir=terraform/environments/staging validate
 
       - name: Terraform Plan
         id: plan
         run: |
-          terraform -chdir=terraform/environments/${{ matrix.env }} plan \
+          terraform -chdir=terraform/environments/staging plan \
             -var="project_id=${{ env.PROJECT_ID }}" \
             -no-color -out=tfplan 2>&1 | tee plan.txt
         continue-on-error: true
@@ -66,7 +91,66 @@ jobs:
             const maxLen = 60000;
             if (plan.length > maxLen) plan = plan.substring(0, maxLen) + '\n... (truncated)';
             const status = '${{ steps.plan.outcome }}' === 'success' ? '✅' : '❌';
-            const output = `### ${status} Terraform Plan — ${{ matrix.env }}\n\`\`\`\n${plan}\n\`\`\`\n*Pushed by: @${{ github.actor }}*`;
+            const output = `### ${status} Terraform Plan — staging\n\`\`\`\n${plan}\n\`\`\`\n*Pushed by: @${{ github.actor }}*`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+      - name: Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+  # ─── Plan prod (only if prod files changed) ──────────
+  plan-prod:
+    name: Plan prod
+    needs: detect
+    if: needs.detect.outputs.prod == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/866925958777/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'github-actions@infra-learning-pdtung1605.iam.gserviceaccount.com'
+
+      - name: Terraform Init
+        run: terraform -chdir=terraform/environments/prod init -input=false
+
+      - name: Terraform Validate
+        run: terraform -chdir=terraform/environments/prod validate
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform -chdir=terraform/environments/prod plan \
+            -var="project_id=${{ env.PROJECT_ID }}" \
+            -no-color -out=tfplan 2>&1 | tee plan.txt
+        continue-on-error: true
+
+      - name: Comment Plan on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let plan = fs.readFileSync('plan.txt', 'utf8');
+            const maxLen = 60000;
+            if (plan.length > maxLen) plan = plan.substring(0, maxLen) + '\n... (truncated)';
+            const status = '${{ steps.plan.outcome }}' === 'success' ? '✅' : '❌';
+            const output = `### ${status} Terraform Plan — prod\n\`\`\`\n${plan}\n\`\`\`\n*Pushed by: @${{ github.actor }}*`;
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
