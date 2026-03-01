@@ -1,4 +1,5 @@
 # ---- App ----
+# Last verified: 2026-03-02
 replicaCount: 1
 
 image:
