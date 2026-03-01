@@ -3,7 +3,7 @@ name: CI — Platform API
 on:
   push:
     branches: [main]
-    paths: ['apps/**', 'deploy/helm/**', '.github/workflows/ci.yaml']
+    paths: ['apps/**', '.github/workflows/ci.yaml']
   pull_request:
     branches: [main]
     paths: ['apps/**', 'deploy/helm/**', '.github/workflows/ci.yaml']
@@ -29,15 +29,15 @@ jobs:
       - name: Run tests
         run: cd apps/platform-api && go test ./...
 
-  # ─── Job 2: Build + Push (only on push to main) ────────
-  # ArgoCD watches the Git repo and auto-syncs deployments.
-  # CI only: test → build → push → Trivy → commit tag.
+  # ─── Job 2: Build + Push (only on merge to main) ───────
+  # ArgoCD Image Updater auto-detects new tags and deploys.
+  # CI only: test → build → push → Trivy scan. No git commits needed.
   build:
     needs: test
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       id-token: write
 
     steps:
@@ -74,14 +74,8 @@ jobs:
           severity: 'CRITICAL'
           exit-code: '1'
 
-      # ── Update image tag → ArgoCD auto-syncs ──
-      - name: Update image tag in values files
+      - name: Summary
         run: |
-          SHORT_SHA=${{ steps.vars.outputs.SHORT_SHA }}
-          sed -i "s|  tag: .*|  tag: \"${SHORT_SHA}\"|" deploy/helm/platform-api/values-prod.yaml
-          sed -i "s|  tag: .*|  tag: \"${SHORT_SHA}\"|" deploy/helm/platform-api/values.yaml
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add deploy/helm/platform-api/values-prod.yaml deploy/helm/platform-api/values.yaml
-          git commit -m "ci: update image to ${SHORT_SHA} [skip ci]" || exit 0
-          git push origin main
+          echo "### ✅ Image pushed" >> $GITHUB_STEP_SUMMARY
+          echo "- Tag: \`${{ steps.vars.outputs.SHORT_SHA }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- ArgoCD Image Updater will auto-detect and deploy" >> $GITHUB_STEP_SUMMARY

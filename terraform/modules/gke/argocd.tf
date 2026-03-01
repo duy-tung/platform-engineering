@@ -89,3 +89,32 @@ resource "helm_release" "argocd" {
 
   depends_on = [kubernetes_namespace.argocd]
 }
+
+# ---- ArgoCD Image Updater — auto-detect new image tags ----
+resource "helm_release" "argocd_image_updater" {
+  count            = var.enable_argocd ? 1 : 0
+  name             = "argocd-image-updater"
+  repository       = "https://argoproj.github.io/argo-helm"
+  chart            = "argocd-image-updater"
+  version          = "0.11.0"
+  namespace        = "argocd"
+  create_namespace = false
+
+  values = [yamlencode({
+    config = {
+      registries = [{
+        name        = "GAR"
+        api_url     = "https://asia-southeast1-docker.pkg.dev"
+        prefix      = "asia-southeast1-docker.pkg.dev"
+        default     = true
+        credentials = "pullsecret:argocd/gar-credentials"
+      }]
+    }
+    resources = {
+      requests = { cpu = "10m", memory = "32Mi" }
+      limits   = { cpu = "100m", memory = "64Mi" }
+    }
+  })]
+
+  depends_on = [helm_release.argocd]
+}
