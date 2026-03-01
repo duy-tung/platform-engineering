@@ -4,7 +4,7 @@
 # =============================================================================
 
 module "vpc" {
-  source     = "../../modules/vpc"
+  source     = "github.com/duy-tung/terraform-modules//vpc?ref=v1.0.0"
   project_id = var.project_id
 
   subnets = {
@@ -22,7 +22,7 @@ module "vpc" {
 }
 
 module "gke" {
-  source       = "../../modules/gke"
+  source       = "github.com/duy-tung/terraform-modules//gke?ref=v1.0.0"
   project_id   = var.project_id
   cluster_name = "staging-cluster"
   location     = "${var.region}-a" # Zonal → free tier

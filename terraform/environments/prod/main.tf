@@ -3,7 +3,7 @@
 # =============================================================================
 
 module "vpc" {
-  source       = "../../modules/vpc"
+  source       = "github.com/duy-tung/terraform-modules//vpc?ref=v1.0.0"
   project_id   = var.project_id
   network_name = "prod-vpc"
 
@@ -22,7 +22,7 @@ module "vpc" {
 }
 
 module "gke" {
-  source       = "../../modules/gke"
+  source       = "github.com/duy-tung/terraform-modules//gke?ref=v1.0.0"
   project_id   = var.project_id
   cluster_name = "prod-cluster"
   location     = var.region # Regional → HA control plane (3 zones)
@@ -79,7 +79,7 @@ resource "google_service_networking_connection" "private_vpc" {
 
 # ---- Cloud SQL HA (big-tech grade) ----
 module "cloudsql" {
-  source     = "../../modules/cloudsql"
+  source     = "github.com/duy-tung/terraform-modules//cloudsql?ref=v1.0.0"
   project_id = var.project_id
   region     = var.region
 
