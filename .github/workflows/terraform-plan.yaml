@@ -42,6 +42,8 @@ jobs:
         with:
           working_directory: terraform/
           soft_fail: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Terraform Init
         run: terraform -chdir=terraform/environments/${{ matrix.env }} init -input=false
