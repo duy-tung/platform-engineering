@@ -24,8 +24,8 @@ metadata:
 spec:
   default:
     config:
-      type: HTTPS
-      httpsHealthCheck:
+      type: HTTP
+      httpHealthCheck:
         requestPath: /healthz
     logConfig:
       enabled: false

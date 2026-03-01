@@ -63,8 +63,6 @@ jobs:
         run: terraform -chdir=terraform/environments/staging init -input=false
 
       - name: Terraform Apply
-        env:
-          TF_VAR_argocd_webhook_secret: ${{ secrets.ARGOCD_WEBHOOK_SECRET }}
         run: |
           terraform -chdir=terraform/environments/staging apply \
             -var="project_id=${{ env.PROJECT_ID }}" \
