@@ -50,6 +50,7 @@ module "gke" {
   # Istio Ambient — platform-managed via Terraform (not ArgoCD)
   enable_istio_ambient = true
 
-  # ArgoCD — platform-managed via Terraform
-  enable_argocd = true
+  # ArgoCD on staging was installed via kustomize/kubectl (not Helm).
+  # Terraform can't adopt non-Helm resources. Keep it manually managed.
+  # enable_argocd = true
 }
