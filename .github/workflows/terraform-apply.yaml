@@ -42,6 +42,9 @@ jobs:
     needs: detect
     if: needs.detect.outputs.staging == 'true'
     runs-on: ubuntu-latest
+    concurrency:
+      group: terraform-staging
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
@@ -74,6 +77,9 @@ jobs:
     needs: detect
     if: needs.detect.outputs.prod == 'true'
     runs-on: ubuntu-latest
+    concurrency:
+      group: terraform-prod
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
