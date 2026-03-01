@@ -3,6 +3,9 @@ name: GitOps Validate
 on:
   pull_request:
     branches: [main]
+    paths:
+      - 'deploy/**'
+      - '.github/workflows/gitops-validate.yaml'
 
 jobs:
   validate:
