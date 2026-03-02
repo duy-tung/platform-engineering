@@ -1,7 +1,7 @@
 # =============================================================================
 # Staging Environment — Internal only, private cluster
 # Zonal cluster (free tier), spot nodes, ArgoCD hub
-# Last verified: 2026-03-02
+# Last verified: 2026-03-02 — case-a isolation test
 # =============================================================================
 
 module "vpc" {
