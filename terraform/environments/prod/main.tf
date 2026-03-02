@@ -1,5 +1,6 @@
 # =============================================================================
 # Production Environment — Regional HA, private cluster, big-tech grade
+# Last verified: 2026-03-02 — case-b prod-only test
 # =============================================================================
 
 module "vpc" {
