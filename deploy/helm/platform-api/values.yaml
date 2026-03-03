@@ -1,5 +1,5 @@
 # ---- App ----
-# Last verified: 2026-03-02
+# Last verified: 2026-03-03 — case2 gitops-only
 replicaCount: 1
 
 image:
