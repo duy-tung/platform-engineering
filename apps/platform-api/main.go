@@ -1,4 +1,4 @@
-// Package main — platform-api service (last verified: 2026-03-02)
+// Package main — platform-api service (last verified: 2026-03-03 — case3 code-only)
 package main
 
 import (
