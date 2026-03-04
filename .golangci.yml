@@ -15,6 +15,12 @@ run:
 linters-settings:
   errcheck:
     check-type-assertions: true
+    exclude-functions:
+      # HTTP response writer — errors here mean client disconnected,
+      # nothing useful to do. Standard Go convention to ignore.
+      - (net/http.ResponseWriter).Write
+      - (*encoding/json.Encoder).Encode
+      - (io.Writer).Write
 
 issues:
   max-issues-per-linter: 50
