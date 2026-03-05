@@ -55,6 +55,9 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive terraform/
+
       - id: auth
         uses: google-github-actions/auth@v2
         with:
@@ -84,22 +87,31 @@ jobs:
             -no-color -out=tfplan 2>&1 | tee plan.txt
         continue-on-error: true
 
-      - name: Comment Plan on PR
-        uses: actions/github-script@v7
+      - name: Find existing comment
+        uses: peter-evans/find-comment@v3
+        id: fc
         with:
-          script: |
-            const fs = require('fs');
-            let plan = fs.readFileSync('plan.txt', 'utf8');
-            const maxLen = 60000;
-            if (plan.length > maxLen) plan = plan.substring(0, maxLen) + '\n... (truncated)';
-            const status = '${{ steps.plan.outcome }}' === 'success' ? '✅' : '❌';
-            const output = `### ${status} Terraform Plan — staging\n\`\`\`\n${plan}\n\`\`\`\n*Pushed by: @${{ github.actor }}*`;
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: output
-            });
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: 'Terraform Plan — staging'
+
+      - name: Comment Plan on PR
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ### ${{ steps.plan.outcome == 'success' && '✅' || '❌' }} Terraform Plan — staging
+            <details><summary>Show Plan</summary>
+
+            ```
+            ${{ steps.plan.outputs.stdout || 'See workflow logs' }}
+            ```
+
+            </details>
+
+            *Pushed by: @${{ github.actor }}*
+          edit-mode: replace
 
       - name: Plan Status
         if: steps.plan.outcome == 'failure'
@@ -125,6 +137,9 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive terraform/
 
       - id: auth
         uses: google-github-actions/auth@v2
@@ -157,22 +172,31 @@ jobs:
             -no-color -out=tfplan 2>&1 | tee plan.txt
         continue-on-error: true
 
-      - name: Comment Plan on PR
-        uses: actions/github-script@v7
+      - name: Find existing comment
+        uses: peter-evans/find-comment@v3
+        id: fc
         with:
-          script: |
-            const fs = require('fs');
-            let plan = fs.readFileSync('plan.txt', 'utf8');
-            const maxLen = 60000;
-            if (plan.length > maxLen) plan = plan.substring(0, maxLen) + '\n... (truncated)';
-            const status = '${{ steps.plan.outcome }}' === 'success' ? '✅' : '❌';
-            const output = `### ${status} Terraform Plan — prod\n\`\`\`\n${plan}\n\`\`\`\n*Pushed by: @${{ github.actor }}*`;
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: output
-            });
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: 'Terraform Plan — prod'
+
+      - name: Comment Plan on PR
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ### ${{ steps.plan.outcome == 'success' && '✅' || '❌' }} Terraform Plan — prod
+            <details><summary>Show Plan</summary>
+
+            ```
+            ${{ steps.plan.outputs.stdout || 'See workflow logs' }}
+            ```
+
+            </details>
+
+            *Pushed by: @${{ github.actor }}*
+          edit-mode: replace
 
       - name: Plan Status
         if: steps.plan.outcome == 'failure'

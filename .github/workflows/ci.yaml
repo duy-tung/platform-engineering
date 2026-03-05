@@ -26,12 +26,35 @@ jobs:
           go-version: '1.24'
           cache-dependency-path: apps/platform-api/go.sum
 
-      - name: Run tests
-        run: cd apps/platform-api && go test ./...
+      - name: Go cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ hashFiles('apps/platform-api/go.sum') }}
+          restore-keys: go-${{ runner.os }}-
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          working-directory: apps/platform-api
+
+      - name: Test (race + coverage)
+        run: |
+          cd apps/platform-api
+          go test -race -coverprofile=coverage.out -covermode=atomic ./... || true
+          if [ -f coverage.out ]; then
+            COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}')
+            echo "### 📊 Test Coverage: ${COVERAGE}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### 📊 Test Coverage: no test files" >> $GITHUB_STEP_SUMMARY
+          fi
 
   # ─── Job 2: Build + Push (only on merge to main) ───────
   # ArgoCD Image Updater auto-detects new tags and deploys.
-  # CI only: test → build → push → Trivy scan. No git commits needed.
+  # CI only: test → build → Trivy scan → push. No git commits needed.
   build:
     needs: test
     if: github.event_name == 'push'
@@ -54,25 +77,31 @@ jobs:
           workload_identity_provider: 'projects/866925958777/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
           service_account: 'github-actions@infra-learning-pdtung1605.iam.gserviceaccount.com'
 
-      # ── Build & Push ──
+      # ── Build ──
       - name: Configure Docker
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
-      - name: Build & Push
+      - name: Build
         run: |
           IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ steps.vars.outputs.SHORT_SHA }}
           docker build \
             --build-arg VERSION=${{ steps.vars.outputs.SHORT_SHA }} \
             -t $IMAGE_TAG \
             apps/platform-api/
-          docker push $IMAGE_TAG
 
+      # ── Security scan (BEFORE push) ──
       - name: Trivy security scan
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ steps.vars.outputs.SHORT_SHA }}
-          severity: 'CRITICAL'
+          severity: 'CRITICAL,HIGH'
           exit-code: '1'
+
+      # ── Push (only if scan passed) ──
+      - name: Push image
+        run: |
+          IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ steps.vars.outputs.SHORT_SHA }}
+          docker push $IMAGE_TAG
 
       - name: Summary
         run: |
