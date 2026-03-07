@@ -1,16 +1,19 @@
-{{- if not .Values.rollout.enabled }}
-apiVersion: apps/v1
-kind: Deployment
+{{- if .Values.rollout.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
   name: {{ .Chart.Name }}
   labels:
     {{- include "platform-api.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
-  {{- if eq (int .Values.replicaCount) 1 }}
+  revisionHistoryLimit: 3
   strategy:
-    type: Recreate
-  {{- end }}
+    canary:
+      canaryService: {{ .Chart.Name }}-canary
+      stableService: {{ .Chart.Name }}
+      steps:
+        {{- toYaml .Values.rollout.canary.steps | nindent 8 }}
   selector:
     matchLabels:
       {{- include "platform-api.selectorLabels" . | nindent 6 }}
@@ -114,14 +117,5 @@ spec:
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- if gt (int .Values.replicaCount) 1 }}
-      topologySpreadConstraints:
-        - maxSkew: 1
-          topologyKey: topology.kubernetes.io/zone
-          whenUnsatisfiable: ScheduleAnyway
-          labelSelector:
-            matchLabels:
-              {{- include "platform-api.selectorLabels" . | nindent 14 }}
       {{- end }}
 {{- end }}

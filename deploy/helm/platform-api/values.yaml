@@ -68,3 +68,14 @@ nodeSelector:
 serviceAccountName: ""
 serviceAccount:
   annotations: {}
+
+# ---- Progressive Delivery (Argo Rollouts) ----
+rollout:
+  enabled: false  # Override to true in prod
+  canary:
+    steps:
+      - setWeight: 20
+      - pause: { duration: 30s }
+      - setWeight: 50
+      - pause: { duration: 30s }
+      - setWeight: 100
