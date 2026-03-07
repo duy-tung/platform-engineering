@@ -36,7 +36,7 @@ jobs:
               - 'terraform/environments/prod/**'
               - '.github/workflows/terraform-apply.yaml'
 
-  # ─── Apply staging (only if staging files changed) ────
+  # ─── Apply staging (runs first) ────────────────────────
   apply-staging:
     name: Apply staging
     needs: detect
@@ -71,12 +71,37 @@ jobs:
             -var="project_id=${{ env.PROJECT_ID }}" \
             -auto-approve -input=false
 
-  # ─── Apply prod (only if prod files changed) ─────────
+      # ── Slack notification ──
+      - name: Notify Slack
+        if: always() && vars.SLACK_ENABLED == 'true'
+        uses: slackapi/slack-github-action@v2.1.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "${{ job.status == 'success' && '✅' || '❌' }} TF Apply staging ${{ job.status }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "${{ job.status == 'success' && '✅' || '❌' }} *Terraform Apply — staging*\n• Status: `${{ job.status }}`\n• Actor: ${{ github.actor }}\n• <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+                  }
+                }
+              ]
+            }
+
+  # ─── Apply prod (after staging, with approval gate) ───
   apply-prod:
     name: Apply prod
-    needs: detect
-    if: needs.detect.outputs.prod == 'true'
+    needs: [detect, apply-staging]
+    if: >-
+      always() &&
+      needs.detect.outputs.prod == 'true' &&
+      (needs.apply-staging.result == 'success' || needs.apply-staging.result == 'skipped')
     runs-on: ubuntu-latest
+    environment: production
     concurrency:
       group: terraform-prod
       cancel-in-progress: false
@@ -107,3 +132,24 @@ jobs:
           terraform -chdir=terraform/environments/prod apply \
             -var="project_id=${{ env.PROJECT_ID }}" \
             -auto-approve -input=false
+
+      # ── Slack notification ──
+      - name: Notify Slack
+        if: always() && vars.SLACK_ENABLED == 'true'
+        uses: slackapi/slack-github-action@v2.1.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "${{ job.status == 'success' && '✅' || '❌' }} TF Apply prod ${{ job.status }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "${{ job.status == 'success' && '✅' || '❌' }} *Terraform Apply — prod*\n• Status: `${{ job.status }}`\n• Actor: ${{ github.actor }}\n• <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+                  }
+                }
+              ]
+            }
