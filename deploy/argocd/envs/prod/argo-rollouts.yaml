@@ -19,6 +19,9 @@ spec:
             limits:
               cpu: 200m
               memory: 128Mi
+          trafficRouterPlugins:
+            - name: "argoproj-labs/gatewayAPI"
+              location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.6.0/gateway-api-plugin-linux-amd64"
         dashboard:
           enabled: false
   destination:

@@ -12,6 +12,11 @@ spec:
     canary:
       canaryService: {{ .Chart.Name }}-canary
       stableService: {{ .Chart.Name }}
+      trafficRouting:
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoute: {{ .Chart.Name }}
+            namespace: {{ .Release.Namespace }}
       steps:
         {{- toYaml .Values.rollout.canary.steps | nindent 8 }}
   selector:
