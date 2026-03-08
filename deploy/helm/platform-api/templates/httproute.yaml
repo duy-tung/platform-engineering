@@ -1,0 +1,39 @@
+{{- if .Values.rollout.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ .Chart.Name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  parentRefs:
+    - name: platform-gateway
+      namespace: istio-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api
+        - path:
+            type: PathPrefix
+            value: /users
+        - path:
+            type: PathPrefix
+            value: /db-check
+        - path:
+            type: Exact
+            value: /health
+        - path:
+            type: Exact
+            value: /ready
+        - path:
+            type: Exact
+            value: /version
+        - path:
+            type: Exact
+            value: /
+      backendRefs:
+        - name: {{ .Chart.Name }}
+          port: {{ .Values.service.port }}
+        - name: {{ .Chart.Name }}-canary
+          port: {{ .Values.service.port }}
+{{- end }}
