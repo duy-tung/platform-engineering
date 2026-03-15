@@ -1,0 +1,76 @@
+# PrometheusRule — alerting rules for platform-api
+# Deployed to monitoring namespace, auto-discovered by Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: platform-api-alerts
+  namespace: monitoring
+  labels:
+    release: monitoring  # Must match Prometheus serviceMonitorSelector
+spec:
+  groups:
+    - name: platform-api.rules
+      rules:
+        # ---- RED Alerts ----
+        - alert: HighErrorRate
+          expr: |
+            (
+              sum(rate(http_server_request_duration_seconds_count{service_name="platform-api", http_response_status_code=~"5.."}[5m]))
+              /
+              sum(rate(http_server_request_duration_seconds_count{service_name="platform-api"}[5m]))
+            ) > 0.05
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "High 5xx error rate on platform-api"
+            description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+        - alert: HighLatency
+          expr: |
+            histogram_quantile(0.99,
+              sum(rate(http_server_request_duration_seconds_bucket{service_name="platform-api"}[5m])) by (le)
+            ) > 2
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High p99 latency on platform-api"
+            description: "p99 latency is {{ $value | humanizeDuration }} (threshold: 2s)"
+
+        # ---- Pod Health Alerts ----
+        - alert: PodCrashLooping
+          expr: |
+            increase(kube_pod_container_status_restarts_total{namespace="production", container="platform-api"}[15m]) > 3
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "platform-api pod is crash-looping"
+            description: "{{ $labels.pod }} restarted {{ $value }} times in 15 minutes"
+
+        - alert: PodNotReady
+          expr: |
+            kube_pod_status_ready{namespace="production", condition="true"} == 0
+            and on(pod) kube_pod_labels{label_app="platform-api"}
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "platform-api pod not ready"
+            description: "{{ $labels.pod }} has been not-ready for 5 minutes"
+
+        # ---- Resource Alerts ----
+        - alert: HighMemoryUsage
+          expr: |
+            (
+              container_memory_working_set_bytes{namespace="production", container="platform-api"}
+              /
+              kube_pod_container_resource_limits{namespace="production", container="platform-api", resource="memory"}
+            ) > 0.9
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "platform-api memory usage >90% of limit"
+            description: "{{ $labels.pod }} memory at {{ $value | humanizePercentage }}"

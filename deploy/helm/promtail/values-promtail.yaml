@@ -1,0 +1,29 @@
+# Promtail — log collector DaemonSet
+# Scrapes pod logs and sends to Loki
+config:
+  clients:
+    - url: http://loki.monitoring:3100/loki/api/v1/push
+
+  snippets:
+    # Parse JSON logs from platform-api (slog output)
+    pipelineStages:
+      - cri: {}
+      - json:
+          expressions:
+            level: level
+            msg: msg
+            trace_id: trace_id
+      - labels:
+          level:
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi
+
+tolerations:
+  - effect: NoSchedule
+    operator: Exists

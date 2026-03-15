@@ -1,18 +1,28 @@
-// Package main — platform-api service (last verified: 2026-03-03 — case3 code-only)
+// Package main — platform-api service with OpenTelemetry observability
 package main
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
+	"log/slog"
+	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
 	"time"
 
 	_ "github.com/lib/pq"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Version được set lúc build bằng -ldflags
@@ -20,6 +30,9 @@ var Version = "dev"
 
 //go:embed static
 var staticFS embed.FS
+
+// tracer for manual span creation in handlers
+var tracer = otel.Tracer("platform-api")
 
 // ---- Models ----
 type User struct {
@@ -65,7 +78,7 @@ func buildDSN() string {
 func initDB() {
 	dsn := buildDSN()
 	if dsn == "" {
-		log.Println("⚠️  DB_HOST (or DATABASE_URL) not set — DB features disabled")
+		slog.Warn("DB_HOST (or DATABASE_URL) not set — DB features disabled")
 		return
 	}
 
@@ -78,11 +91,15 @@ func initDB() {
 		if err == nil {
 			break
 		}
-		log.Printf("⏳ DB connection attempt %d/10 failed: %v", i+1, err)
+		slog.Warn("DB connection attempt failed",
+			"attempt", i+1,
+			"max", 10,
+			"error", err,
+		)
 		time.Sleep(3 * time.Second)
 	}
 	if err != nil {
-		log.Printf("❌ Could not connect to DB after 10 attempts: %v", err)
+		slog.Error("Could not connect to DB after 10 attempts", "error", err)
 		return
 	}
 
@@ -100,39 +117,97 @@ func initDB() {
 		)
 	`)
 	if err != nil {
-		log.Printf("❌ Migration failed: %v", err)
+		slog.Error("Migration failed", "error", err)
 		return
 	}
-	log.Println("✅ DB connected + migrated")
+	slog.Info("DB connected + migrated")
 }
 
 func main() {
+	// Structured JSON logging
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+	slog.SetDefault(logger)
+
+	if err := run(); err != nil {
+		slog.Error("Server failed", "error", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	// ---- Initialize OpenTelemetry ----
+	otelShutdown, err := setupOTelSDK(ctx)
+	if err != nil {
+		return fmt.Errorf("setting up OTel SDK: %w", err)
+	}
+	defer func() {
+		err = errors.Join(err, otelShutdown(context.Background()))
+	}()
+
+	initDB()
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	initDB()
-
 	mux := http.NewServeMux()
 
-	// ---- Health ----
+	// ---- Health (no otelhttp wrapping — keep health checks lightweight) ----
 	mux.HandleFunc("/health", handleHealth)
 	mux.HandleFunc("/ready", handleReady)
 	mux.HandleFunc("/version", handleVersion)
-	mux.HandleFunc("/db-check", handleDBCheck)
+
+	// ---- Prometheus metrics endpoint ----
+	mux.Handle("/metrics", promhttp.Handler())
 
 	// ---- CRUD Users ----
-	mux.HandleFunc("/users", handleUsers)
-	mux.HandleFunc("/users/", handleUserByID)
+	mux.Handle("/users", http.HandlerFunc(handleUsers))
+	mux.Handle("/users/", http.HandlerFunc(handleUserByID))
+
+	// ---- DB check ----
+	mux.Handle("/db-check", http.HandlerFunc(handleDBCheck))
 
 	// ---- Root: serve UI ----
 	mux.HandleFunc("/", handleRoot)
 
-	log.Printf("🚀 platform-api %s starting on :%s", Version, port)
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
-		log.Fatalf("Server failed: %v", err)
+	// Wrap entire mux with otelhttp for HTTP metrics + trace propagation
+	handler := otelhttp.NewHandler(mux, "platform-api",
+		otelhttp.WithMessageEvents(otelhttp.ReadEvents, otelhttp.WriteEvents),
+	)
+
+	srv := &http.Server{
+		Addr:         ":" + port,
+		BaseContext:  func(net.Listener) context.Context { return ctx },
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		Handler:      handler,
 	}
+
+	slog.Info("platform-api starting",
+		"version", Version,
+		"port", port,
+		"otel_endpoint", os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
+	)
+
+	srvErr := make(chan error, 1)
+	go func() {
+		srvErr <- srv.ListenAndServe()
+	}()
+
+	select {
+	case err = <-srvErr:
+		return err
+	case <-ctx.Done():
+		stop()
+	}
+
+	return srv.Shutdown(context.Background())
 }
 
 // ---- Handlers ----
@@ -168,20 +243,29 @@ func handleVersion(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleDBCheck(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	w.Header().Set("Content-Type", "application/json")
+
 	if db == nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		json.NewEncoder(w).Encode(map[string]string{"status": "error", "message": "DATABASE_URL not configured"})
 		return
 	}
+
+	_, span := tracer.Start(ctx, "db.ping")
 	start := time.Now()
-	err := db.Ping()
+	err := db.PingContext(ctx)
 	latency := time.Since(start)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		span.End()
 		w.WriteHeader(http.StatusServiceUnavailable)
 		json.NewEncoder(w).Encode(map[string]string{"status": "error", "message": err.Error()})
 		return
 	}
+	span.SetAttributes(attribute.String("db.latency", latency.String()))
+	span.End()
+
 	json.NewEncoder(w).Encode(map[string]string{
 		"status":  "ok",
 		"message": "database connected",
@@ -199,9 +283,9 @@ func handleUsers(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		listUsers(w)
+		listUsers(r.Context(), w)
 	case http.MethodPost:
-		createUser(w, r)
+		createUser(r.Context(), w, r)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		json.NewEncoder(w).Encode(map[string]string{"error": "method not allowed"})
@@ -225,20 +309,32 @@ func handleUserByID(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		getUser(w, idStr)
+		getUser(r.Context(), w, idStr)
 	case http.MethodPut:
-		updateUser(w, r, idStr)
+		updateUser(r.Context(), w, r, idStr)
 	case http.MethodDelete:
-		deleteUser(w, idStr)
+		deleteUser(r.Context(), w, idStr)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		json.NewEncoder(w).Encode(map[string]string{"error": "method not allowed"})
 	}
 }
 
-func listUsers(w http.ResponseWriter) {
-	rows, err := db.Query("SELECT id, name, email, created_at FROM users ORDER BY id")
+// ---- DB Operations (with tracing) ----
+
+func listUsers(ctx context.Context, w http.ResponseWriter) {
+	ctx, span := tracer.Start(ctx, "db.query",
+		trace.WithAttributes(
+			attribute.String("db.system", "postgresql"),
+			attribute.String("db.operation", "SELECT"),
+			attribute.String("db.sql.table", "users"),
+		),
+	)
+	defer span.End()
+
+	rows, err := db.QueryContext(ctx, "SELECT id, name, email, created_at FROM users ORDER BY id")
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
@@ -253,19 +349,31 @@ func listUsers(w http.ResponseWriter) {
 		}
 		users = append(users, u)
 	}
+	span.SetAttributes(attribute.Int("db.result_count", len(users)))
 	json.NewEncoder(w).Encode(users)
 }
 
-func getUser(w http.ResponseWriter, idStr string) {
+func getUser(ctx context.Context, w http.ResponseWriter, idStr string) {
+	ctx, span := tracer.Start(ctx, "db.query",
+		trace.WithAttributes(
+			attribute.String("db.system", "postgresql"),
+			attribute.String("db.operation", "SELECT"),
+			attribute.String("db.sql.table", "users"),
+		),
+	)
+	defer span.End()
+
 	var user User
-	err := db.QueryRow("SELECT id, name, email, created_at FROM users WHERE id = $1", idStr).
+	err := db.QueryRowContext(ctx, "SELECT id, name, email, created_at FROM users WHERE id = $1", idStr).
 		Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt)
 	if err == sql.ErrNoRows {
+		span.SetAttributes(attribute.Bool("db.not_found", true))
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]string{"error": "user not found"})
 		return
 	}
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
@@ -273,7 +381,7 @@ func getUser(w http.ResponseWriter, idStr string) {
 	json.NewEncoder(w).Encode(user)
 }
 
-func createUser(w http.ResponseWriter, r *http.Request) {
+func createUser(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Name  string `json:"name"`
 		Email string `json:"email"`
@@ -289,21 +397,33 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx, span := tracer.Start(ctx, "db.query",
+		trace.WithAttributes(
+			attribute.String("db.system", "postgresql"),
+			attribute.String("db.operation", "INSERT"),
+			attribute.String("db.sql.table", "users"),
+		),
+	)
+	defer span.End()
+
 	var user User
-	err := db.QueryRow(
+	err := db.QueryRowContext(ctx,
 		"INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, name, email, created_at",
 		input.Name, input.Email,
 	).Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		w.WriteHeader(http.StatusConflict)
 		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("could not create user: %v", err)})
 		return
 	}
+	span.SetAttributes(attribute.Int("db.user_id", user.ID))
+	slog.InfoContext(ctx, "user created", "user_id", user.ID, "email", user.Email)
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(user)
 }
 
-func updateUser(w http.ResponseWriter, r *http.Request, idStr string) {
+func updateUser(ctx context.Context, w http.ResponseWriter, r *http.Request, idStr string) {
 	var input struct {
 		Name  string `json:"name"`
 		Email string `json:"email"`
@@ -319,37 +439,61 @@ func updateUser(w http.ResponseWriter, r *http.Request, idStr string) {
 		return
 	}
 
+	ctx, span := tracer.Start(ctx, "db.query",
+		trace.WithAttributes(
+			attribute.String("db.system", "postgresql"),
+			attribute.String("db.operation", "UPDATE"),
+			attribute.String("db.sql.table", "users"),
+		),
+	)
+	defer span.End()
+
 	var user User
-	err := db.QueryRow(
+	err := db.QueryRowContext(ctx,
 		"UPDATE users SET name = $1, email = $2 WHERE id = $3 RETURNING id, name, email, created_at",
 		input.Name, input.Email, idStr,
 	).Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt)
 	if err == sql.ErrNoRows {
+		span.SetAttributes(attribute.Bool("db.not_found", true))
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]string{"error": "user not found"})
 		return
 	}
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		w.WriteHeader(http.StatusConflict)
 		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("could not update user: %v", err)})
 		return
 	}
+	slog.InfoContext(ctx, "user updated", "user_id", user.ID)
 	json.NewEncoder(w).Encode(user)
 }
 
-func deleteUser(w http.ResponseWriter, idStr string) {
-	result, err := db.Exec("DELETE FROM users WHERE id = $1", idStr)
+func deleteUser(ctx context.Context, w http.ResponseWriter, idStr string) {
+	ctx, span := tracer.Start(ctx, "db.query",
+		trace.WithAttributes(
+			attribute.String("db.system", "postgresql"),
+			attribute.String("db.operation", "DELETE"),
+			attribute.String("db.sql.table", "users"),
+		),
+	)
+	defer span.End()
+
+	result, err := db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", idStr)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
+		span.SetAttributes(attribute.Bool("db.not_found", true))
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]string{"error": "user not found"})
 		return
 	}
+	slog.InfoContext(ctx, "user deleted", "user_id", idStr)
 	json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
 }
 

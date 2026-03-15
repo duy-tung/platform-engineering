@@ -79,3 +79,11 @@ rollout:
       - setWeight: 50
       - pause: { duration: 30s }
       - setWeight: 100
+
+# ---- OpenTelemetry ----
+otel:
+  enabled: false  # Override to true in prod
+  collectorEndpoint: ""
+  serviceName: platform-api
+  environment: development
+
