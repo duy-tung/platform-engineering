@@ -54,3 +54,11 @@ rollout:
       - setWeight: 50
       - pause: { duration: 60s }
       - setWeight: 100
+
+# ---- OpenTelemetry ----
+otel:
+  enabled: true
+  collectorEndpoint: "otel-collector-opentelemetry-collector.monitoring:4318"
+  serviceName: platform-api
+  environment: production
+

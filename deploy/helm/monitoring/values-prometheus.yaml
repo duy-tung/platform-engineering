@@ -1,4 +1,5 @@
-# kube-prometheus-stack — lean config for learning (e2-medium nodes)
+# kube-prometheus-stack — production config with observability deep dive
+# Includes: Prometheus, Grafana (with Tempo + Loki datasources), AlertManager (Slack)
 prometheus:
   prometheusSpec:
     retention: 7d
@@ -22,6 +23,35 @@ prometheus:
         operator: "Equal"
         value: "true"
         effect: "PreferNoSchedule"
+    # Enable exemplar storage — links metrics to traces
+    enableFeatures:
+      - exemplar-storage
+    # Scrape pods with prometheus.io annotations
+    additionalScrapeConfigs:
+      - job_name: 'pod-annotations'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: pod
 
 grafana:
   adminPassword: "admin"  # Change in prod
@@ -55,7 +85,77 @@ grafana:
       value: "true"
       effect: "PreferNoSchedule"
 
+  # ---- Additional Datasources (Tempo for traces, Loki for logs) ----
+  additionalDataSources:
+    - name: Tempo
+      type: tempo
+      uid: tempo
+      url: http://tempo.monitoring:3100
+      access: proxy
+      isDefault: false
+      jsonData:
+        tracesToMetrics:
+          datasourceUid: prometheus
+          tags:
+            - key: service.name
+              value: service_name
+        serviceMap:
+          datasourceUid: prometheus
+        nodeGraph:
+          enabled: true
+    - name: Loki
+      type: loki
+      uid: loki
+      url: http://loki.monitoring:3100
+      access: proxy
+      isDefault: false
+      jsonData:
+        derivedFields:
+          - name: TraceID
+            matcherRegex: '"trace_id":"(\w+)"'
+            url: "$${__value.raw}"
+            datasourceUid: tempo
+
+  # ---- Dashboard sidecar — auto-loads ConfigMaps with grafana_dashboard=1 ----
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      folder: /tmp/dashboards
+      folderAnnotation: grafana_dashboard_folder
+      provider:
+        foldersFromFilesStructure: false
+
+# ---- AlertManager — Slack integration ----
 alertmanager:
+  config:
+    global:
+      resolve_timeout: 5m
+    receivers:
+      - name: 'default'
+        slack_configs:
+          - channel: '#platform-alerts'
+            send_resolved: true
+            title: '{{ if eq .Status "firing" }}🔥{{ else }}✅{{ end }} {{ .CommonLabels.alertname }}'
+            text: >-
+              {{ range .Alerts }}
+              *Severity:* `{{ .Labels.severity }}`
+              *Summary:* {{ .Annotations.summary }}
+              *Description:* {{ .Annotations.description }}
+              {{ end }}
+            api_url_file: /etc/alertmanager/secrets/slack-webhook-url/url
+      - name: 'null'
+    route:
+      receiver: 'default'
+      group_by: ['alertname', 'namespace']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      routes:
+        - match:
+            alertname: Watchdog
+          receiver: 'null'
   alertmanagerSpec:
     resources:
       requests:

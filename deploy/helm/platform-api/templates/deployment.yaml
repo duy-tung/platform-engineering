@@ -21,6 +21,9 @@ spec:
         sidecar.istio.io/proxyCPULimit: "500m"
         sidecar.istio.io/proxyMemory: "64Mi"
         sidecar.istio.io/proxyMemoryLimit: "256Mi"
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.service.targetPort | quote }}
+        prometheus.io/path: "/metrics"
       labels:
         {{- include "platform-api.selectorLabels" . | nindent 8 }}
     spec:
@@ -60,6 +63,14 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.database.credentials.existingSecret | default "db-secret" }}
                   key: database
+            {{- if .Values.otel.enabled }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.otel.collectorEndpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.otel.serviceName | default .Chart.Name | quote }}
+            - name: OTEL_ENVIRONMENT
+              value: {{ .Values.otel.environment | default "development" | quote }}
+            {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

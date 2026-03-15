@@ -1,0 +1,45 @@
+# Grafana Tempo — single binary mode for trace storage
+# Lightweight config for e2-medium Spot nodes
+#
+# Receives traces from OTel Collector via OTLP gRPC
+# Grafana queries Tempo directly
+
+tempo:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  extraArgs:
+    - "-config.expand-env=true"
+  retention: 48h
+  tolerations:
+    - key: "spot"
+      operator: "Equal"
+      value: "true"
+      effect: "PreferNoSchedule"
+
+  # Storage: local filesystem with PVC
+  storage:
+    trace:
+      backend: local
+      local:
+        path: /var/tempo/traces
+      wal:
+        path: /var/tempo/wal
+
+persistence:
+  enabled: true
+  size: 5Gi
+  accessModes:
+    - ReadWriteOnce
+
+# Receive OTLP traces
+traces:
+  otlp:
+    grpc:
+      enabled: true
+    http:
+      enabled: true
