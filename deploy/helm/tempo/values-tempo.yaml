@@ -12,14 +12,12 @@ tempo:
     limits:
       cpu: 200m
       memory: 256Mi
+  # extraArgs must be a map, not a list (Tempo Helm chart spec)
   extraArgs:
-    - "-config.expand-env=true"
+    config.expand-env: "true"
   retention: 48h
-  tolerations:
-    - key: "spot"
-      operator: "Equal"
-      value: "true"
-      effect: "PreferNoSchedule"
+  # Disable mem-ballast — not needed for small deployments and wastes RAM
+  memBallastSizeMbs: 0
 
   # Storage: local filesystem with PVC
   storage:
@@ -29,6 +27,12 @@ tempo:
         path: /var/tempo/traces
       wal:
         path: /var/tempo/wal
+
+  tolerations:
+    - key: "spot"
+      operator: "Equal"
+      value: "true"
+      effect: "PreferNoSchedule"
 
 persistence:
   enabled: true

@@ -4,6 +4,10 @@
 mode: deployment
 replicaCount: 1
 
+# Required by chart >= 0.100 — must explicitly set image
+image:
+  repository: otel/opentelemetry-collector-contrib
+
 resources:
   requests:
     cpu: 25m
